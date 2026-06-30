@@ -2,14 +2,29 @@
 *.obj
 *.exp
 *.lib
+*.ilk
+*.pdb
+*.pch
+*.sdf
+*.suo
+*.user
+*.aps
+*.winmd
+*.winmdpdb
+ref/
+refint/
+
+# Publish/release output
 bin/
 obj/
-# publish/ is release output, kept in repo
+publish/
+dist/
+
 # IDE
 .vscode/
 .idea/
 
-# Secrets
+# Secrets & credentials
 .env
 *.token
 secrets/
@@ -17,3 +32,10 @@ secrets/
 # OS
 .DS_Store
 Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# NX temporary files
+*.bak
+*.tmp
+*.swp
