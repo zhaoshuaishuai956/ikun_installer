@@ -1,0 +1,36 @@
+! 爱坤工具箱 (ikun tools) Menu
+
+VERSION 121
+
+EDIT UG_GATEWAY_MAIN_MENUBAR
+
+AFTER UG_HELP
+  CASCADE_BUTTON IKUN_TOOLS_NAME
+  LABEL 爱坤工具箱
+END_OF_AFTER
+
+MENU IKUN_TOOLS_NAME
+  BUTTON IKUN_EJECTOR
+  LABEL 爱坤-顶针快速布局
+  BITMAP ikun_ejector.bmp
+  ACTIONS ejector_layout.dll
+
+  SEPARATOR
+
+  BUTTON IKUN_PMI
+  LABEL 爱坤-PMI孔位标注(国标)
+  BITMAP ikun_pmi.bmp
+  ACTIONS pmi_hole_dim.dll
+  SEPARATOR
+
+  BUTTON IKUN_BLOCKBOSS
+  LABEL 爱坤-活动块定位凸台
+  BITMAP ikun_block_boss_layout.bmp
+  ACTIONS block_boss_layout.dll
+  SEPARATOR
+
+  BUTTON IKUN_NESTER
+  LABEL 爱坤-多实体排样
+  BITMAP ikun_MultiEntityNester.bmp
+  ACTIONS MultiEntityNester.dll
+END_OF_MENU

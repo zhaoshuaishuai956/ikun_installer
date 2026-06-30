@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyTitle>爱坤工具箱 NX 安装器</AssemblyTitle>
+    <ApplicationIcon>ikun-tools.ico</ApplicationIcon>
+    <AssemblyName>ikun_installer</AssemblyName>
+    <Version>2.0.1</Version>
+    <!-- 自包含发布 + 只保留中文语言资源 -->
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SatelliteResourceLanguages>zh-Hans</SatelliteResourceLanguages>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+
+  <!-- 嵌入所有部署资源 -->
+  <ItemGroup>
+    <EmbeddedResource Include="DeployResources\startup\**\*" />
+    <EmbeddedResource Include="DeployResources\application\**\*" />
+  </ItemGroup>
+
+</Project>

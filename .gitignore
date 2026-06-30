@@ -1,0 +1,19 @@
+# Build artifacts
+*.obj
+*.exp
+*.lib
+bin/
+obj/
+publish/
+# IDE
+.vscode/
+.idea/
+
+# Secrets
+.env
+*.token
+secrets/
+
+# OS
+.DS_Store
+Thumbs.db
