@@ -4,7 +4,7 @@
 *.lib
 bin/
 obj/
-publish/
+# publish/ is release output, kept in repo
 # IDE
 .vscode/
 .idea/
