@@ -24,6 +24,7 @@ $subIcon = @{
     "MultiEntityNester"       = "排样"
     "smart_ejector_heater"    = "加热"
     "block_boss_layout"       = "凸台"
+    "single_line_text"        = "刻字"
 }
 
 # =============================================================
@@ -71,6 +72,20 @@ foreach ($proj in $readyProjects) {
         if ($needCopy) {
             Copy-Item $dlx.FullName $dest -Force
             Write-Host "    $name -> $($dlx.Name)" -ForegroundColor Green
+            $synced++
+        }
+    }
+    # 附带数据文件 (如 single_line_text 的 slfont.dat 单线字库), 与 dll 同目录部署
+    $dats = Get-ChildItem "$($proj.FullName)\*.dat" -ErrorAction SilentlyContinue
+    foreach ($dat in $dats) {
+        $dest = Join-Path $AppRes $dat.Name
+        $needCopy = $true
+        if (Test-Path $dest) {
+            if ($dat.LastWriteTime -le (Get-Item $dest).LastWriteTime) { $needCopy = $false }
+        }
+        if ($needCopy) {
+            Copy-Item $dat.FullName $dest -Force
+            Write-Host "    $name -> $($dat.Name)" -ForegroundColor Green
             $synced++
         }
     }

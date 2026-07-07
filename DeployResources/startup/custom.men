@@ -33,4 +33,10 @@ MENU IKUN_TOOLS_NAME
   LABEL 爱坤-多实体排样
   BITMAP ikun_MultiEntityNester.bmp
   ACTIONS MultiEntityNester.dll
+  SEPARATOR
+
+  BUTTON IKUN_SLTEXT
+  LABEL 爱坤-单线字体刻字
+  BITMAP ikun_single_line_text.bmp
+  ACTIONS single_line_text.dll
 END_OF_MENU
