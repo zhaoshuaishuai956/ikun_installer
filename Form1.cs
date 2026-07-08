@@ -26,7 +26,7 @@ public partial class Form1 : Form
 
     private void InitializeComponent()
     {
-        this.Text = "爱坤工具箱 NX 安装器 v2.0";
+        this.Text = "爱坤工具箱 NX 安装器 v2.1";
         this.Size = new Size(600, 500);
         this.StartPosition = FormStartPosition.CenterScreen;
         this.FormBorderStyle = FormBorderStyle.FixedDialog;

@@ -9,7 +9,7 @@
     <AssemblyTitle>爱坤工具箱 NX 安装器</AssemblyTitle>
     <ApplicationIcon>ikun-tools.ico</ApplicationIcon>
     <AssemblyName>ikun_installer</AssemblyName>
-    <Version>2.0.1</Version>
+    <Version>2.1.0</Version>
     <!-- 自包含发布 + 只保留中文语言资源 -->
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
