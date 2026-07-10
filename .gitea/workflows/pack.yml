@@ -38,16 +38,31 @@ jobs:
           git clone --quiet --depth 1 --branch master \
             "https://${PAT}@${GITEA_HOST}/${GITEA_OWNER}/${GITEA_REPO}.git" repo
 
+      - name: 计算版本号
+        working-directory: repo
+        run: |
+          set -e
+          BASE=$(grep -oP '<Version>\K[^<]+' ikun_installer.csproj | head -1)
+          BASE="${BASE:-0.0.0}"
+          BUILD="${{ github.run_number }}"
+          [ -z "$BUILD" ] && BUILD="$(date '+%Y%m%d')"
+          echo "VERSION=${BASE}.${BUILD}" >> "$GITHUB_ENV"
+          echo "版本: ${BASE}.${BUILD}"
+
       - name: 收集子项目部署资源
         working-directory: repo
         run: bash ci/assemble.sh
+
+      - name: 生成缺失的工具栏图标
+        working-directory: repo
+        run: bash ci/gen-icons.sh
 
       - name: 交叉编译单文件 exe (win-x64)
         working-directory: repo
         run: |
           set -e
           dotnet publish ikun_installer.csproj -c Release \
-            -p:EnableWindowsTargeting=true -o out
+            -p:EnableWindowsTargeting=true -p:Version="${VERSION}" -o out
           ls -la out/ikun_installer.exe
 
       - name: 更新 Gitea Release (只放 exe)
@@ -55,4 +70,6 @@ jobs:
         run: |
           set -e
           export BUILD_TIME="$(date '+%Y-%m-%d %H:%M') CST"
+          export VERSION="${VERSION}"
+          export PLUGIN_COUNT="$(jq '.plugins | length' plugins.json)"
           bash ci/publish-release.sh out/ikun_installer.exe

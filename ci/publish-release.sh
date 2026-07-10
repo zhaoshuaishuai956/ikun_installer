@@ -15,23 +15,26 @@ TAG="${RELEASE_TAG:-latest}"
 NAME="ikun_installer.exe"
 : "${PAT:?需要 PAT}"
 BUILD_TIME="${BUILD_TIME:-auto}"
+VERSION="${VERSION:-0.0.0}"
+PLUGIN_COUNT="${PLUGIN_COUNT:-?}"
 API="https://${HOST}/api/v1/repos/${OWNER}/${REPO}"
 AUTH="Authorization: token ${PAT}"
 
 [ -f "$EXE" ] || { echo "错误: 找不到 $EXE"; exit 1; }
 
-body="爱坤工具箱 NX 安装器 — 自动构建于 ${BUILD_TIME}。从各插件子项目最新提交自动打包, 下载 ikun_installer.exe 运行即可。"
+title="爱坤工具箱 v${VERSION}"
+body="爱坤工具箱 NX 安装器 v${VERSION}\n\n- 自动构建于 ${BUILD_TIME}\n- 包含 ${PLUGIN_COUNT} 个插件, 从各子项目最新提交打包\n- 下载 ikun_installer.exe 运行即可 (自包含单文件, 无需 .NET)"
 
 rid=$(curl -sS -H "$AUTH" "${API}/releases/tags/${TAG}" | jq -r '.id // empty')
 if [ -z "$rid" ]; then
-  echo "创建 release ${TAG}"
+  echo "创建 release ${TAG} (${title})"
   rid=$(curl -sS -X POST -H "$AUTH" -H "Content-Type: application/json" \
-    -d "$(jq -n --arg t "$TAG" --arg b "$body" '{tag_name:$t, name:"爱坤工具箱 (最新自动构建)", body:$b}')" \
+    -d "$(jq -n --arg t "$TAG" --arg n "$title" --arg b "$body" '{tag_name:$t, name:$n, body:$b}')" \
     "${API}/releases" | jq -r '.id // empty')
 else
-  echo "更新 release ${TAG} (id=${rid})"
+  echo "更新 release ${TAG} (${title}, id=${rid})"
   curl -sS -X PATCH -H "$AUTH" -H "Content-Type: application/json" \
-    -d "$(jq -n --arg b "$body" '{name:"爱坤工具箱 (最新自动构建)", body:$b}')" \
+    -d "$(jq -n --arg n "$title" --arg b "$body" '{name:$n, body:$b}')" \
     "${API}/releases/${rid}" >/dev/null
   aid=$(curl -sS -H "$AUTH" "${API}/releases/${rid}/assets" | jq -r ".[] | select(.name==\"${NAME}\") | .id")
   if [ -n "$aid" ]; then
