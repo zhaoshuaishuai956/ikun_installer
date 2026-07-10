@@ -1,0 +1,58 @@
+name: pack-installer
+# 打包爱坤工具箱安装器: 收集各子项目资源 -> 交叉编译 win-x64 单文件 exe -> 更新 Gitea Release
+# 触发: 子项目 push 后经 dispatch(workflow_dispatch), 或本仓库关键文件变更(push)
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [master]
+    paths:
+      - ikun_installer.csproj
+      - Form1.cs
+      - Program.cs
+      - plugins.json
+      - ci/**
+      - DeployResources/startup/**
+
+jobs:
+  pack:
+    runs-on: dotnet          # act_runner 上映射为 docker://mcr.microsoft.com/dotnet/sdk:9.0
+    env:
+      PAT: ${{ secrets.INSTALLER_DISPATCH_TOKEN }}
+      GITEA_HOST: gt.h.zss.fan:2233
+      GITEA_OWNER: zhaoshen
+      GITEA_REPO: ikun_installer
+      RELEASE_TAG: latest
+    steps:
+      - name: 准备工具 (jq)
+        run: |
+          set -e
+          if ! command -v jq >/dev/null; then
+            apt-get update -qq && apt-get install -y -qq jq >/dev/null
+          fi
+          echo "jq $(jq --version), dotnet $(dotnet --version)"
+
+      - name: 拉取安装器仓库
+        run: |
+          set -e
+          rm -rf repo
+          git clone --quiet --depth 1 --branch master \
+            "https://${PAT}@${GITEA_HOST}/${GITEA_OWNER}/${GITEA_REPO}.git" repo
+
+      - name: 收集子项目部署资源
+        working-directory: repo
+        run: bash ci/assemble.sh
+
+      - name: 交叉编译单文件 exe (win-x64)
+        working-directory: repo
+        run: |
+          set -e
+          dotnet publish ikun_installer.csproj -c Release \
+            -p:EnableWindowsTargeting=true -o out
+          ls -la out/ikun_installer.exe
+
+      - name: 更新 Gitea Release (只放 exe)
+        working-directory: repo
+        run: |
+          set -e
+          export BUILD_TIME="$(date '+%Y-%m-%d %H:%M') CST"
+          bash ci/publish-release.sh out/ikun_installer.exe
