@@ -24,7 +24,14 @@ AUTH="Authorization: token ${PAT}"
 [ -f "$EXE" ] || { echo "错误: 找不到 $EXE"; exit 1; }
 
 title="爱坤工具箱 v${VERSION}"
-body="$(printf '爱坤工具箱 NX 安装器 v%s\n\n- 自动构建于 %s\n- 包含 %s 个插件, 从各子项目最新提交打包\n- 下载 ikun_installer.exe 运行即可 (自包含单文件, 无需 .NET)' "$VERSION" "$BUILD_TIME" "$PLUGIN_COUNT")"
+body="$(cat <<EOF
+爱坤工具箱 NX 安装器 v${VERSION}
+
+- 自动构建于 ${BUILD_TIME}
+- 包含 ${PLUGIN_COUNT} 个插件, 从各子项目最新提交打包
+- 下载 ikun_installer.exe 运行即可 (自包含单文件, 无需 .NET)
+EOF
+)"
 
 # 让 latest 标签跟到最新提交: 删旧 release + 旧标签, 再在当前提交处重建 release
 SHA="$(git rev-parse HEAD 2>/dev/null || true)"
