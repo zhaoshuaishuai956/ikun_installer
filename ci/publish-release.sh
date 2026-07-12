@@ -3,7 +3,8 @@
 #  publish-release.sh — 创建/更新 Gitea Release, 只上传 ikun_installer.exe
 #  用法: publish-release.sh <exe路径>
 #  依赖环境变量: PAT; 可选: GITEA_HOST/OWNER/REPO, RELEASE_TAG, BUILD_TIME
-#  策略: 固定 tag(默认 latest), 已存在则更新说明并替换同名附件
+#  策略: 滚动 tag(默认 latest), 每次删旧 release+标签后在【当前最新提交】重建,
+#        使标签始终指向最新提交(页面不再停在旧提交); 版本号随 run_number 递增。
 # ============================================================
 set -euo pipefail
 
@@ -25,25 +26,22 @@ AUTH="Authorization: token ${PAT}"
 title="爱坤工具箱 v${VERSION}"
 body="$(printf '爱坤工具箱 NX 安装器 v%s\n\n- 自动构建于 %s\n- 包含 %s 个插件, 从各子项目最新提交打包\n- 下载 ikun_installer.exe 运行即可 (自包含单文件, 无需 .NET)' "$VERSION" "$BUILD_TIME" "$PLUGIN_COUNT")"
 
-rid=$(curl -sS -H "$AUTH" "${API}/releases/tags/${TAG}" | jq -r '.id // empty')
-if [ -z "$rid" ]; then
-  echo "创建 release ${TAG} (${title})"
-  rid=$(curl -sS -X POST -H "$AUTH" -H "Content-Type: application/json" \
-    -d "$(jq -n --arg t "$TAG" --arg n "$title" --arg b "$body" '{tag_name:$t, name:$n, body:$b}')" \
-    "${API}/releases" | jq -r '.id // empty')
-else
-  echo "更新 release ${TAG} (${title}, id=${rid})"
-  curl -sS -X PATCH -H "$AUTH" -H "Content-Type: application/json" \
-    -d "$(jq -n --arg n "$title" --arg b "$body" '{name:$n, body:$b}')" \
-    "${API}/releases/${rid}" >/dev/null
-  aid=$(curl -sS -H "$AUTH" "${API}/releases/${rid}/assets" | jq -r ".[] | select(.name==\"${NAME}\") | .id")
-  if [ -n "$aid" ]; then
-    echo "删除旧附件 id=${aid}"
-    curl -sS -X DELETE -H "$AUTH" "${API}/releases/${rid}/assets/${aid}" >/dev/null
-  fi
+# 让 latest 标签跟到最新提交: 删旧 release + 旧标签, 再在当前提交处重建 release
+SHA="$(git rev-parse HEAD 2>/dev/null || true)"
+old=$(curl -sS -H "$AUTH" "${API}/releases/tags/${TAG}" | jq -r '.id // empty')
+if [ -n "$old" ]; then
+  echo "删除旧 release id=${old} (标签将重指向 ${SHA:0:8})"
+  curl -sS -X DELETE -H "$AUTH" "${API}/releases/${old}" >/dev/null
 fi
+# 删可能残留的旧标签(删 release 未必删除 git tag; 不先删则新建 release 会沿用旧 tag 的提交)
+curl -sS -o /dev/null -X DELETE -H "$AUTH" "${API}/tags/${TAG}" || true
+echo "创建 release ${TAG} @ ${SHA:0:8} (${title})"
+rid=$(curl -sS -X POST -H "$AUTH" -H "Content-Type: application/json" \
+  -d "$(jq -n --arg t "$TAG" --arg c "$SHA" --arg n "$title" --arg b "$body" \
+        '{tag_name:$t, target_commitish:$c, name:$n, body:$b}')" \
+  "${API}/releases" | jq -r '.id // empty')
 
-[ -z "$rid" ] && { echo "错误: 无法获取 release id"; exit 1; }
+[ -z "$rid" ] && { echo "错误: 无法创建 release"; exit 1; }
 
 echo "上传 ${NAME} ($(du -h "$EXE" | cut -f1))"
 url=$(curl -sS -X POST -H "$AUTH" \
