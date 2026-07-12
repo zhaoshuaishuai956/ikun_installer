@@ -39,4 +39,10 @@ MENU IKUN_TOOLS_NAME
   LABEL 爱坤-单线字体刻字
   BITMAP ikun_single_line_text.bmp
   ACTIONS single_line_text.dll
+  SEPARATOR
+
+  BUTTON IKUN_TEXTLAYOUT
+  LABEL 爱坤-文字拉伸排版
+  BITMAP ikun_text_auto_layout.bmp
+  ACTIONS text_auto_layout.dll
 END_OF_MENU

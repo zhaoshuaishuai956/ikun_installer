@@ -6,6 +6,7 @@
     { "repo": "block_boss_layout",  "ref": "master", "icon": "凸台" },
     { "repo": "ejector_layout",     "ref": "master", "icon": "顶针" },
     { "repo": "pmi_hole_dim",       "ref": "master", "icon": "PMI"  },
-    { "repo": "single_line_text",   "ref": "master", "icon": "刻字" }
+    { "repo": "single_line_text",   "ref": "master", "icon": "刻字" },
+    { "repo": "text_auto_layout",   "ref": "master", "icon": "排版" }
   ]
 }
