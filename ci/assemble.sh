@@ -53,7 +53,7 @@ while IFS='|' read -r repo ref; do
   shopt -s nullglob
   for g in "${globs[@]}"; do
     for f in "$dest"/$g; do
-      if [ -f "$f" ]; then
+      if [ -f "$f" ] && [ ! -L "$f" ]; then   # 拒绝 symlink: 防 evil.dll -> /proc/1/environ (security_review)
         cp -f "$f" "$APP_DIR/"
         echo "  + $(basename "$f")"
         n=$((n + 1)); total=$((total + 1))
