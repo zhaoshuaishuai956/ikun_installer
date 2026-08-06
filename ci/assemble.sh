@@ -39,6 +39,10 @@ while IFS='|' read -r repo ref; do
     while IFS= read -r g; do
       g="${g%%#*}"
       g="$(echo -n "$g" | tr -d '[:space:]')"
+      # 安全: 拒绝含 / 的 glob(路径穿越/绝对路径), 只允许文件名模式 (security_review HIGH)
+      case "$g" in
+        */*) echo "  跳过不安全 glob: $g (禁止含 /)"; continue ;;
+      esac
       [ -n "$g" ] && globs+=("$g")
     done < "$dest/ikun-deploy.txt"
     echo "  部署清单(ikun-deploy.txt): ${globs[*]:-<空>}"
