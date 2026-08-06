@@ -7,6 +7,7 @@
     { "repo": "ejector_layout",     "ref": "master", "icon": "顶针" },
     { "repo": "pmi_hole_dim",       "ref": "master", "icon": "PMI"  },
     { "repo": "single_line_text",   "ref": "master", "icon": "刻字" },
-    { "repo": "text_auto_layout",   "ref": "master", "icon": "排版" }
+    { "repo": "text_auto_layout",   "ref": "master", "icon": "排版" },
+    { "repo": "plate_dwg_export",   "ref": "master", "icon": "板面" }
   ]
 }
