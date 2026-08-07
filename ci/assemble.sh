@@ -31,7 +31,7 @@ sanitize_summary() {
       inner = substr(t, b + 1, index(t, "](") - b - 1)
       s = substr(s, 1, RSTART - 1) inner substr(s, RSTART + RLENGTH)
     }
-    gsub(/https?:\/\/[^[:space:])]+|www\.[^[:space:])]+/, "", s)
+    gsub(/[Hh][Tt][Tt][Pp][Ss]?:\/\/[^[:space:])]+|[Ff][Tt][Pp]:\/\/[^[:space:])]+|[Ww][Ww][Ww]\.[^[:space:])]+|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/, "", s)
     gsub(/<[^>]*>/, "", s)
     sub(/^[[:space:]]+|[[:space:]]+$/, "", s)
     print s
@@ -109,7 +109,8 @@ while IFS='|' read -r repo ref; do
         exit
       }
     ' "$dest/CHANGELOG.md" 2>/dev/null) || true
-    if [ -n "$chg_ver" ]; then
+    # 版本号严格三段式校验, 防畸形版本行携带 markdown 注入 (security_review)
+    if [[ "$chg_ver" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
       chg_summary=$(printf '%s\n' "${chg_summary:-更新}" | sanitize_summary)
       echo "- **${repo}** (${chg_ver}): ${chg_summary}" >> "$CHANGES_FILE"
     else
