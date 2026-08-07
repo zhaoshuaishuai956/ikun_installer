@@ -85,6 +85,15 @@ while IFS='|' read -r repo ref; do
         sub(/^[[:space:]]*-[[:space:]]*/, "", s)
         sub(/^\*\*/, "", s)
         sub(/\*\*/, "", s)
+        # 净化外部输入: 剥 markdown 链接/图片/HTML/裸 URL, 只留纯文本 (security_review MEDIUM)
+        while (match(s, /!?\[[^]]*\]\([^)]*\)/)) {
+          t = substr(s, RSTART, RLENGTH)
+          b = index(t, "[")
+          inner = substr(t, b + 1, index(t, "](") - b - 1)
+          s = substr(s, 1, RSTART - 1) inner substr(s, RSTART + RLENGTH)
+        }
+        gsub(/https?:\/\/[^[:space:])]+/, "", s)
+        gsub(/<[^>]*>/, "", s)
         sub(/[[:space:]]+$/, "", s)
         print v, s
         exit
