@@ -90,6 +90,7 @@ while IFS='|' read -r repo ref; do
   # ---- 记录子项目更新说明 (供 Release 发布正文使用) ----
   # 优先取 CHANGELOG.md 最新版本段的标题+首条变更; 缺失时回退最新 commit 标题
   if [ -f "$dest/CHANGELOG.md" ]; then
+    chg_ver=; chg_summary=   # 先初始化: read EOF 零数据时不赋值, set -u 下避免 unbound 中止 (security_review)
     read -r chg_ver chg_summary < <(awk '
       /^##[[:space:]]*v?[0-9]/ {
         if (inblock) exit
