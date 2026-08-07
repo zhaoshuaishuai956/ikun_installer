@@ -18,6 +18,9 @@ refint/
 bin/
 obj/
 publish/
+
+# CI 运行时生成物 (assemble.sh 输出的子项目变更摘要)
+ci/_plugin_changes.md
 dist/
 
 # IDE

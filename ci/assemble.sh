@@ -4,6 +4,8 @@
 #  运行环境: mcr.microsoft.com/dotnet/sdk:9.0 容器 (git/curl/jq 可用)
 #  依赖环境变量: PAT (克隆私有子仓库用的 token)
 #  产物: 重建 DeployResources/application/ (扁平放置各插件的部署文件)
+#        + 生成 ci/_plugin_changes.md (各子项目 CHANGELOG.md 最新版本摘要,
+#          供 publish-release.sh 写入 Release 发布说明)
 #
 #  通用打包规则:
 #   - 子项目根目录若有 ikun-deploy.txt, 按其中每行一个 glob 收集(可含注释#)
@@ -15,6 +17,8 @@ set -euo pipefail
 HOST="${GITEA_HOST:-gt.h.zss.fan:2233}"
 OWNER="${GITEA_OWNER:-zhaoshen}"
 APP_DIR="DeployResources/application"
+# 子项目变更摘要输出(相对本脚本定位, 与 publish-release.sh 共用)
+CHANGES_FILE="$(dirname "$0")/_plugin_changes.md"
 : "${PAT:?需要 PAT 环境变量(克隆子仓库)}"
 
 WORK="$(mktemp -d)"
@@ -23,6 +27,7 @@ trap 'rm -rf "$WORK"' EXIT
 echo "== 重建 $APP_DIR =="
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR"
+: > "$CHANGES_FILE"   # 清空子项目变更摘要
 
 total=0
 while IFS='|' read -r repo ref; do
@@ -62,6 +67,38 @@ while IFS='|' read -r repo ref; do
   done
   shopt -u nullglob
   [ "$n" -eq 0 ] && echo "  !! 警告: $repo 未匹配到任何部署文件"
+
+  # ---- 记录子项目更新说明 (供 Release 发布正文使用) ----
+  # 优先取 CHANGELOG.md 最新版本段的标题+首条变更; 缺失时回退最新 commit 标题
+  if [ -f "$dest/CHANGELOG.md" ]; then
+    read -r chg_ver chg_summary < <(awk '
+      /^##[[:space:]]*v?[0-9]/ {
+        if (inblock) exit
+        inblock = 1
+        v = $0
+        sub(/^##[[:space:]]*v?/, "", v)
+        sub(/[[:space:]].*$/, "", v)
+        next
+      }
+      inblock && /^[[:space:]]*-/ {
+        s = $0
+        sub(/^[[:space:]]*-[[:space:]]*/, "", s)
+        sub(/^\*\*/, "", s)
+        sub(/\*\*/, "", s)
+        sub(/[[:space:]]+$/, "", s)
+        print v, s
+        exit
+      }
+    ' "$dest/CHANGELOG.md" 2>/dev/null) || true
+    if [ -n "$chg_ver" ]; then
+      echo "- **${repo}** (${chg_ver}): ${chg_summary:-更新}" >> "$CHANGES_FILE"
+    else
+      echo "- **${repo}**: 无 CHANGELOG 版本记录" >> "$CHANGES_FILE"
+    fi
+  else
+    cmsg=$(git -C "$dest" log -1 --pretty='%s' 2>/dev/null || true)
+    echo "- **${repo}**: ${cmsg:-更新}" >> "$CHANGES_FILE"
+  fi
 done < <(jq -r '.plugins[] | "\(.repo)|\(.ref // "master")"' plugins.json)
 
 echo "== 收集完成, 共 $total 个文件 =="

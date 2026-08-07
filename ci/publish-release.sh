@@ -24,12 +24,25 @@ AUTH="Authorization: token ${PAT}"
 [ -f "$EXE" ] || { echo "错误: 找不到 $EXE"; exit 1; }
 
 title="爱坤工具箱 v${VERSION}"
+
+# 读取子项目更新说明 (assemble.sh 生成); 缺失/为空时回退提示语
+CHANGES_FILE="$(dirname "$0")/_plugin_changes.md"
+if [ -f "$CHANGES_FILE" ] && [ -s "$CHANGES_FILE" ]; then
+  PLUGIN_CHANGES=$(cat "$CHANGES_FILE")
+else
+  PLUGIN_CHANGES="（本次无子项目变更详情）"
+fi
+
 body="$(cat <<EOF
 爱坤工具箱 NX 安装器 v${VERSION}
 
 - 自动构建于 ${BUILD_TIME}
 - 包含 ${PLUGIN_COUNT} 个插件, 从各子项目最新提交打包
 - 下载 ikun_installer.exe 运行即可 (自包含单文件, 无需 .NET)
+
+## 子项目更新内容
+
+${PLUGIN_CHANGES}
 EOF
 )"
 
