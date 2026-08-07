@@ -19,6 +19,25 @@ OWNER="${GITEA_OWNER:-zhaoshen}"
 APP_DIR="DeployResources/application"
 # 子项目变更摘要输出(相对本脚本定位, 与 publish-release.sh 共用)
 CHANGES_FILE="$(dirname "$0")/_plugin_changes.md"
+
+# 净化外部输入摘要: 剥 markdown 链接/图片/HTML/裸 URL(含 www.), 只留纯文本
+# (security_review MEDIUM: CHANGELOG 与 commit 标题均属子仓库外部输入, 会进公开 Release 正文)
+sanitize_summary() {
+  awk '{
+    s = $0
+    while (match(s, /!?\[[^]]*\]\([^)]*\)/)) {
+      t = substr(s, RSTART, RLENGTH)
+      b = index(t, "[")
+      inner = substr(t, b + 1, index(t, "](") - b - 1)
+      s = substr(s, 1, RSTART - 1) inner substr(s, RSTART + RLENGTH)
+    }
+    gsub(/https?:\/\/[^[:space:])]+|www\.[^[:space:])]+/, "", s)
+    gsub(/<[^>]*>/, "", s)
+    sub(/^[[:space:]]+|[[:space:]]+$/, "", s)
+    print s
+  }'
+}
+
 : "${PAT:?需要 PAT 环境变量(克隆子仓库)}"
 
 WORK="$(mktemp -d)"
@@ -85,28 +104,21 @@ while IFS='|' read -r repo ref; do
         sub(/^[[:space:]]*-[[:space:]]*/, "", s)
         sub(/^\*\*/, "", s)
         sub(/\*\*/, "", s)
-        # 净化外部输入: 剥 markdown 链接/图片/HTML/裸 URL, 只留纯文本 (security_review MEDIUM)
-        while (match(s, /!?\[[^]]*\]\([^)]*\)/)) {
-          t = substr(s, RSTART, RLENGTH)
-          b = index(t, "[")
-          inner = substr(t, b + 1, index(t, "](") - b - 1)
-          s = substr(s, 1, RSTART - 1) inner substr(s, RSTART + RLENGTH)
-        }
-        gsub(/https?:\/\/[^[:space:])]+/, "", s)
-        gsub(/<[^>]*>/, "", s)
         sub(/[[:space:]]+$/, "", s)
         print v, s
         exit
       }
     ' "$dest/CHANGELOG.md" 2>/dev/null) || true
     if [ -n "$chg_ver" ]; then
-      echo "- **${repo}** (${chg_ver}): ${chg_summary:-更新}" >> "$CHANGES_FILE"
+      chg_summary=$(printf '%s\n' "${chg_summary:-更新}" | sanitize_summary)
+      echo "- **${repo}** (${chg_ver}): ${chg_summary}" >> "$CHANGES_FILE"
     else
       echo "- **${repo}**: 无 CHANGELOG 版本记录" >> "$CHANGES_FILE"
     fi
   else
     cmsg=$(git -C "$dest" log -1 --pretty='%s' 2>/dev/null || true)
-    echo "- **${repo}**: ${cmsg:-更新}" >> "$CHANGES_FILE"
+    cmsg=$(printf '%s\n' "${cmsg:-更新}" | sanitize_summary)
+    echo "- **${repo}**: ${cmsg}" >> "$CHANGES_FILE"
   fi
 done < <(jq -r '.plugins[] | "\(.repo)|\(.ref // "master")"' plugins.json)
 
