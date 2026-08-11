@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using Microsoft.Win32;
 
@@ -11,15 +12,20 @@ public partial class Form1 : Form
     private TextBox txtNxPath = null!;
     private Button btnBrowse = null!;
     private Button btnInstall = null!;
+    private Button btnCheckUpdate = null!;
+    private Label lblProxy = null!;
+    private TextBox txtProxy = null!;
     private ProgressBar progressBar = null!;
     private RichTextBox txtLog = null!;
 
     // === 部署资源根命名空间 ===
     private const string ResourceRoot = "ikun_installer.DeployResources";
     private const string IkToolDir = @"D:\Program Files\ikun tools";
+    private readonly string? _proxyArg;
 
-    public Form1()
+    public Form1(string? proxyArg = null)
     {
+        _proxyArg = proxyArg;
         InitializeComponent();
         AutoDetectNx();
     }
@@ -27,7 +33,7 @@ public partial class Form1 : Form
     private void InitializeComponent()
     {
         this.Text = "爱坤工具箱 NX 安装器 v2.1";
-        this.Size = new Size(600, 500);
+        this.Size = new Size(600, 560);
         this.StartPosition = FormStartPosition.CenterScreen;
         this.FormBorderStyle = FormBorderStyle.FixedDialog;
         this.MaximizeBox = false;
@@ -73,19 +79,49 @@ public partial class Form1 : Form
         btnBrowse.Click += BtnBrowse_Click;
         y += 36;
 
-        // 安装按钮
+        // 更新代理地址 (默认 192.168.1.5:6666, 可留空=直连; 存 HKCU\Software\ikun_tools)
+        lblProxy = new Label
+        {
+            Text = "更新代理地址(可空):",
+            Font = new Font("Microsoft YaHei", 9),
+            AutoSize = true,
+            Location = new Point(20, y)
+        };
+        y += 24;
+        txtProxy = new TextBox
+        {
+            Font = new Font("Consolas", 9),
+            Location = new Point(20, y),
+            Size = new Size(460, 24),
+            Text = _proxyArg ?? UpdateManager.ReadProxy() ?? UpdateManager.DefaultProxy
+        };
+        y += 36;
+
+        // 安装按钮 + 检查更新按钮
         btnInstall = new Button
         {
             Text = "安  装",
             Font = new Font("Microsoft YaHei", 12, FontStyle.Bold),
             Location = new Point(20, y),
-            Size = new Size(550, 40),
+            Size = new Size(380, 40),
             BackColor = Color.FromArgb(255, 160, 0),
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat
         };
         btnInstall.FlatAppearance.BorderSize = 0;
         btnInstall.Click += BtnInstall_Click;
+        btnCheckUpdate = new Button
+        {
+            Text = "检查更新",
+            Font = new Font("Microsoft YaHei", 10, FontStyle.Bold),
+            Location = new Point(410, y),
+            Size = new Size(160, 40),
+            BackColor = Color.FromArgb(64, 128, 255),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat
+        };
+        btnCheckUpdate.FlatAppearance.BorderSize = 0;
+        btnCheckUpdate.Click += BtnCheckUpdate_Click;
         y += 50;
 
         // 进度条
@@ -114,7 +150,10 @@ public partial class Form1 : Form
         this.Controls.Add(lblNxPath);
         this.Controls.Add(txtNxPath);
         this.Controls.Add(btnBrowse);
+        this.Controls.Add(lblProxy);
+        this.Controls.Add(txtProxy);
         this.Controls.Add(btnInstall);
+        this.Controls.Add(btnCheckUpdate);
         this.Controls.Add(progressBar);
         this.Controls.Add(txtLog);
     }
@@ -193,6 +232,111 @@ public partial class Form1 : Form
         Log("未自动检测到 NX 1847, 请手动浏览指定路径", Color.DarkOrange);
     }
 
+    private async void BtnCheckUpdate_Click(object? sender, EventArgs e)
+    {
+        // 保存代理配置(供 NX 侧按钮复用)
+        UpdateManager.SaveProxy(txtProxy.Text.Trim());
+        btnCheckUpdate.Enabled = false;
+        try
+        {
+            Log("\n== 检查更新 ==", Color.Black);
+            var proxy = UpdateManager.NormalizeProxy(txtProxy.Text.Trim());
+            if (txtProxy.Text.Trim().Length > 0 && proxy == null)
+            {
+                Log($"  代理格式无效: {txtProxy.Text.Trim()} (应为 host:port 或 scheme://host:port)", Color.Red);
+                MessageBox.Show("代理地址格式无效, 应为 host:port (如 192.168.1.5:6666) 或留空", "代理格式错误",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            var local = UpdateManager.GetLocalVersion();
+            Log($"  本地版本: v{local}  代理: {(proxy ?? "(直连)")}", Color.DarkGray);
+
+            var remote = await UpdateManager.FetchRemoteAsync(proxy);
+            if (remote == null)
+            {
+                Log("  检查失败: 无法连接 Gitea 或解析版本信息", Color.Red);
+                MessageBox.Show("检查更新失败:\n无法连接 Gitea 或解析版本信息。\n请检查网络与代理地址。",
+                    "检查失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            Log($"  远端版本: v{remote.Version}  (大小 {(remote.Size / 1024 / 1024.0):F1} MB)", Color.DarkGray);
+            if (!UpdateManager.IsNewer(remote.Version, local))
+            {
+                Log($"  已是最新版本 v{local}", Color.Green);
+                MessageBox.Show($"已是最新版本: v{local}", "检查更新", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            var ask = MessageBox.Show(
+                $"发现新版本 v{remote.Version} (当前 v{local})\n\n是否立即下载更新?",
+                "发现新版本", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+            if (ask != DialogResult.Yes) return;
+
+            // 下载 (进度条复用安装进度条)
+            Log($"  开始下载 {remote.DownloadUrl}", Color.DarkGray);
+            progressBar.Value = 0;
+            var progress = new Progress<double>(p => progressBar.Value = Math.Min(100, (int)(p * 100)));
+            var path = await UpdateManager.DownloadAsync(remote, proxy, progress);
+            if (path == null)
+            {
+                Log("  下载失败: 请检查代理与网络", Color.Red);
+                MessageBox.Show("下载失败:\n请检查网络、代理地址, 或稍后重试。", "下载失败",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            Log($"  下载完成: {path} ({new FileInfo(path).Length / 1024 / 1024.0:F1} MB)", Color.Green);
+
+            var ok = MessageBox.Show(
+                $"新版本 v{remote.Version} 已下载完成.\n\n是否立即启动更新安装?",
+                "下载完成", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (ok == DialogResult.Yes)
+            {
+                if (!UpdateManager.LaunchInstaller(path, remote.Version))
+                {
+                    Log("  启动更新安装失败(校验未通过或已被替换), 请重新下载", Color.Red);
+                    return;
+                }
+                Application.Exit();
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"  检查更新异常: {ex.Message}", Color.Red);
+        }
+        finally
+        {
+            btnCheckUpdate.Enabled = true;
+        }
+    }
+
+    /// <summary>用 icacls 收紧目录 ACL: Administrators/SYSTEM 完全控制, Users 只读 (防目录内文件被低权限用户替换)</summary>
+    private static void HardenDirAcl(string dir)
+    {
+        try
+        {
+            if (!Directory.Exists(dir)) return;
+            // icacls 用绝对路径, 防应用目录/CWD 的恶意同名 exe 劫持 (security HIGH)
+            var icacls = Path.Combine(Environment.SystemDirectory, "icacls.exe");
+            if (!File.Exists(icacls)) return;
+            // 使用 SID 形式避免本地化语言差异; /inheritance:r 去掉继承的宽松 ACL
+            var psi = new ProcessStartInfo(icacls,
+                $"\"{dir}\" /inheritance:r " +
+                "/grant:r \"*S-1-5-32-544\":(OI)(CI)F " +   // Administrators
+                "/grant:r \"*S-1-5-18\":(OI)(CI)F " +       // SYSTEM
+                "/grant:r \"*S-1-5-32-545\":(OI)(CI)RX")     // Users 只读
+            {
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+            using var p = Process.Start(psi);
+            p?.WaitForExit(15000);
+        }
+        catch { /* 非致命: 若 icacls 失败(非管理员), 安装流程继续 */ }
+    }
+
     private async void BtnInstall_Click(object? sender, EventArgs e)
     {
         btnInstall.Enabled = false;
@@ -226,6 +370,14 @@ public partial class Form1 : Form
             Log($"  {appDir}", Color.Green);
             progressBar.Value = (int)(2.0 / totalSteps * 100);
 
+            // 步骤2.5: 收紧目录 ACL (仅 Administrators/SYSTEM 可写, Users 只读)
+            // 防低权限用户替换 ikun_installer.exe/插件 dll 后, 其他用户运行 NX 触发更新时执行恶意代码
+            Log("\n[2.5/5] 收紧目录权限...", Color.Black);
+            HardenDirAcl(startupDir);
+            HardenDirAcl(appDir);
+            HardenDirAcl(IkToolDir);
+            Log("  仅 Administrators/SYSTEM 可写 (Users 只读)", Color.Green);
+
             // 步骤3: 释放部署文件
             Log("\n[3/5] 释放部署文件...", Color.Black);
             await Task.Run(() => ExtractResources(startupDir, appDir));
@@ -249,6 +401,7 @@ public partial class Form1 : Form
                 { Path.Combine(appDir, "ejector_layout.dlx"), false },
                 { Path.Combine(appDir, "pmi_hole_dim.dll"), true },
                 { Path.Combine(appDir, "pmi_hole_dim.dlx"), false },
+                { Path.Combine(appDir, "ikun_updater.dll"), true },  // NX 检查更新插件
             };
             var missing = new List<string>();
             foreach (var kv in filesToCheck)
@@ -274,6 +427,10 @@ public partial class Form1 : Form
             Log("  爱坤工具箱 安装成功!", Color.Green);
             Log("========================================", Color.Green);
             Log("使用: 重启 NX 1847 -> Help 右侧 -> 爱坤工具箱", Color.Blue);
+
+            // 安装器自复制到 ikun tools 目录, 供 NX 侧「检查更新」按钮调用
+            UpdateManager.SelfCopyToToolsDir(IkToolDir);
+            Log($"  安装器已就位: {Path.Combine(IkToolDir, UpdateManager.AssetName)}", Color.DarkGray);
 
             MessageBox.Show(
                 "安装成功!\n\n重启 NX 1847 后, 在菜单栏 Help 右侧\n点击「爱坤工具箱」即可使用。",
@@ -320,6 +477,13 @@ public partial class Form1 : Form
             else if (fullName.StartsWith(ResourceRoot + ".application."))
             {
                 relPath = fullName.Substring((ResourceRoot + ".application.").Length);
+                subDir = appDir;
+            }
+            else if (fullName.StartsWith("ikun_installer.nxplugin."))
+            {
+                // NX 更新插件(ikun_updater.dll)释放到 application, 供菜单 ACTIONS 调用
+                // 注意: EmbeddedResource 默认逻辑名 = RootNamespace + 相对路径点号化 (非 ResourceRoot 前缀)
+                relPath = fullName.Substring("ikun_installer.nxplugin.".Length);
                 subDir = appDir;
             }
             else

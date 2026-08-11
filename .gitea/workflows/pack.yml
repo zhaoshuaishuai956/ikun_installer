@@ -9,8 +9,11 @@ on:
       - ikun_installer.csproj
       - Form1.cs
       - Program.cs
+      - UpdateManager.cs
+      - UpdateCheckForm.cs
       - plugins.json
       - ci/**
+      - nxplugin/**
       - DeployResources/startup/**
 
 jobs:

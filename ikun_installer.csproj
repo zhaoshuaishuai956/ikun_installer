@@ -22,10 +22,11 @@
     <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
 
-  <!-- 嵌入所有部署资源 -->
+  <!-- 嵌入所有部署资源 + NX 更新插件(由本机 nxplugin/build.ps1 编译) -->
   <ItemGroup>
     <EmbeddedResource Include="DeployResources\startup\**\*" />
     <EmbeddedResource Include="DeployResources\application\**\*" />
+    <EmbeddedResource Include="nxplugin\ikun_updater.dll" />
   </ItemGroup>
 
 </Project>

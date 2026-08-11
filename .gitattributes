@@ -2,3 +2,13 @@
 *.sh   text eol=lf
 *.yml  text eol=lf
 *.yaml text eol=lf
+
+# 源码/配置统一 text 属性: git 内部规范化行尾(LF), diff 忽略 CRLF/LF 差异
+*.cs    text
+*.csproj text
+*.cpp   text
+*.hpp   text
+*.ps1   text
+*.md    text
+*.json  text
+*.txt   text

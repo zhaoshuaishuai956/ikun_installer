@@ -4,13 +4,32 @@ static class Program
 {
     /// <summary>
     ///  The main entry point for the application.
+    ///  --check-update [--proxy host:port] : 静默检查更新(NX 侧按钮/启动自动检测调起)
+    ///  --proxy host:port                 : 指定更新代理(可与 GUI 模式混用, 覆盖注册表)
     /// </summary>
     [STAThread]
-    static void Main()
+    static void Main(string[] args)
     {
-        // To customize application configuration such as set high DPI settings or default font,
-        // see https://aka.ms/applicationconfiguration.
         ApplicationConfiguration.Initialize();
-        Application.Run(new Form1());
-    }    
+
+        var proxyArg = ExtractProxyArg(args);
+        if (args.Contains("--check-update"))
+        {
+            Application.Run(new UpdateCheckForm(proxyArg));
+            return;
+        }
+
+        Application.Run(new Form1(proxyArg));
+    }
+
+    /// <summary>从参数里取 --proxy 的下一段; 无则 null</summary>
+    private static string? ExtractProxyArg(string[] args)
+    {
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i] == "--proxy" && !string.IsNullOrWhiteSpace(args[i + 1]))
+                return args[i + 1].Trim();
+        }
+        return null;
+    }
 }

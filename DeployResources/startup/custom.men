@@ -52,4 +52,10 @@ MENU IKUN_TOOLS_NAME
   BITMAP ikun_plate_dwg_export.bmp
   ACTIONS plate_dwg_export.dll
 
+
+  BUTTON IKUN_UPDATE
+  LABEL 工具箱-检查更新
+  BITMAP ikun_tools.bmp
+  ACTIONS ikun_updater.dll
+
 END_OF_MENU
