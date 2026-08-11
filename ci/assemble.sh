@@ -4,8 +4,8 @@
 #  运行环境: mcr.microsoft.com/dotnet/sdk:9.0 容器 (git/curl/jq 可用)
 #  依赖环境变量: PAT (克隆私有子仓库用的 token)
 #  产物: 重建 DeployResources/application/ (扁平放置各插件的部署文件)
-#        + 生成 ci/_plugin_changes.md (各子项目 CHANGELOG.md 最新版本摘要,
-#          供 publish-release.sh 写入 Release 发布说明)
+#        + 生成 ci/_plugin_changes.md (相对上次 Release 的子项目增量摘要)
+#        + 生成 ci/_plugin_revisions.json (本次实际打包的子项目提交基线)
 #
 #  通用打包规则:
 #   - 子项目根目录若有 ikun-deploy.txt, 按其中每行一个 glob 收集(可含注释#)
@@ -14,34 +14,48 @@
 # ============================================================
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=release-notes.sh
+source "$SCRIPT_DIR/release-notes.sh"
+
 HOST="${GITEA_HOST:-gt.h.zss.fan:2233}"
 OWNER="${GITEA_OWNER:-zhaoshen}"
+INSTALLER_REPO="${GITEA_REPO:-ikun_installer}"
+RELEASE_TAG="${RELEASE_TAG:-latest}"
 APP_DIR="DeployResources/application"
-# 子项目变更摘要输出(相对本脚本定位, 与 publish-release.sh 共用)
-CHANGES_FILE="$(dirname "$0")/_plugin_changes.md"
-
-# 净化外部输入摘要: 剥 markdown 链接/图片/HTML/裸 URL(含 www.), 只留纯文本
-# (security_review MEDIUM: CHANGELOG 与 commit 标题均属子仓库外部输入, 会进公开 Release 正文)
-sanitize_summary() {
-  awk '{
-    s = $0
-    while (match(s, /!?\[[^]]*\]\([^)]*\)/)) {
-      t = substr(s, RSTART, RLENGTH)
-      b = index(t, "[")
-      inner = substr(t, b + 1, index(t, "](") - b - 1)
-      s = substr(s, 1, RSTART - 1) inner substr(s, RSTART + RLENGTH)
-    }
-    gsub(/[Hh][Tt][Tt][Pp][Ss]?:\/\/[^[:space:])]+|[Ff][Tt][Pp]:\/\/[^[:space:])]+|[Ww][Ww][Ww]\.[^[:space:])]+|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/, "", s)
-    gsub(/<[^>]*>/, "", s)
-    sub(/^[[:space:]]+|[[:space:]]+$/, "", s)
-    print s
-  }'
-}
+CHANGES_FILE="$SCRIPT_DIR/_plugin_changes.md"
+REVISIONS_FILE="$SCRIPT_DIR/_plugin_revisions.json"
+API="https://${HOST}/api/v1/repos/${OWNER}/${INSTALLER_REPO}"
 
 : "${PAT:?需要 PAT 环境变量(克隆子仓库)}"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
+PREVIOUS_REVISIONS="$WORK/previous_plugin_revisions.json"
+printf '{"schema":1,"plugins":{}}\n' > "$PREVIOUS_REVISIONS"
+
+# WHY: 滚动 Release 的 tag 每次都会重建，仓库自身不能表示上次安装包包含了哪些子项目提交。
+# 因此发布脚本把提交清单作为不可见元数据写入 Release 正文；下一次打包先读取它再做增量比较。
+echo "== 读取上次 Release 的子项目版本基线 =="
+if release_json=$(curl --fail --silent --show-error --max-time 20 -H "Authorization: token ${PAT}" \
+    "${API}/releases/tags/${RELEASE_TAG}" 2>/dev/null); then
+  marker=$(printf '%s' "$release_json" | jq -r '.body // ""' |
+    grep -oE '<!-- ikun-plugin-revisions:[A-Za-z0-9+/=]+ -->' | tail -1 || true)
+  encoded="${marker#<!-- ikun-plugin-revisions:}"
+  encoded="${encoded% -->}"
+  candidate="$WORK/previous_candidate.json"
+  if [ -n "$marker" ] && printf '%s' "$encoded" | base64 -d > "$candidate" 2>/dev/null &&
+      jq -e '.schema == 1 and (.plugins | type == "object")' "$candidate" >/dev/null 2>&1; then
+    cp "$candidate" "$PREVIOUS_REVISIONS"
+    echo "  已恢复 $(jq '.plugins | length' "$PREVIOUS_REVISIONS") 个子项目基线"
+  else
+    echo "  旧 Release 尚无版本清单，本次将建立初始基线"
+  fi
+else
+  echo "  未找到旧 Release，本次将建立初始基线"
+fi
+
+printf '{"schema":1,"plugins":{}}\n' > "$REVISIONS_FILE"
 
 echo "== 重建 $APP_DIR =="
 rm -rf "$APP_DIR"
@@ -55,8 +69,23 @@ while IFS='|' read -r repo ref; do
   echo "== 收集 $repo @ $ref =="
   dest="$WORK/$repo"
   # dll/dlx/dat 都是普通 git 对象(非 LFS); 跳过 LFS 平滑, 避免容器无 git-lfs 报错
-  GIT_LFS_SKIP_SMUDGE=1 git clone --quiet --depth 1 --branch "$ref" \
+  GIT_LFS_SKIP_SMUDGE=1 git clone --quiet --depth 100 --branch "$ref" \
     "https://${PAT}@${HOST}/${OWNER}/${repo}.git" "$dest"
+
+  current_sha=$(git -C "$dest" rev-parse HEAD)
+  old_sha=$(jq -r --arg repo "$repo" '.plugins[$repo].sha // empty' "$PREVIOUS_REVISIONS")
+  # 通常 100 层浅历史足够；长时间未发布或分支重写时再按需补全，兼顾速度与正确性。
+  if [[ "$old_sha" =~ ^[0-9a-fA-F]{7,64}$ ]] &&
+      ! git -C "$dest" cat-file -e "${old_sha}^{commit}" 2>/dev/null; then
+    if [ "$(git -C "$dest" rev-parse --is-shallow-repository)" = "true" ]; then
+      git -C "$dest" fetch --quiet --unshallow origin "$ref" || true
+    fi
+    git -C "$dest" fetch --quiet origin "$old_sha" || true
+  fi
+  revision_tmp="$REVISIONS_FILE.tmp"
+  jq --arg repo "$repo" --arg ref "$ref" --arg sha "$current_sha" \
+    '.plugins[$repo] = {ref:$ref, sha:$sha}' "$REVISIONS_FILE" > "$revision_tmp"
+  mv "$revision_tmp" "$REVISIONS_FILE"
 
   globs=()
   if [ -f "$dest/ikun-deploy.txt" ]; then
@@ -87,42 +116,40 @@ while IFS='|' read -r repo ref; do
   shopt -u nullglob
   [ "$n" -eq 0 ] && echo "  !! 警告: $repo 未匹配到任何部署文件"
 
-  # ---- 记录子项目更新说明 (供 Release 发布正文使用) ----
-  # 优先取 CHANGELOG.md 最新版本段的标题+首条变更; 缺失时回退最新 commit 标题
-  if [ -f "$dest/CHANGELOG.md" ]; then
-    chg_ver=; chg_summary=   # 先初始化: read EOF 零数据时不赋值, set -u 下避免 unbound 中止 (security_review)
-    read -r chg_ver chg_summary < <(awk '
-      /^##[[:space:]]*v?[0-9]/ {
-        if (inblock) exit
-        inblock = 1
-        v = $0
-        sub(/^##[[:space:]]*v?/, "", v)
-        sub(/[[:space:]].*$/, "", v)
-        next
-      }
-      inblock && /^[[:space:]]*-/ {
-        s = $0
-        sub(/^[[:space:]]*-[[:space:]]*/, "", s)
-        sub(/^\*\*/, "", s)
-        sub(/\*\*/, "", s)
-        sub(/[[:space:]]+$/, "", s)
-        print v, s
-        exit
-      }
-    ' "$dest/CHANGELOG.md" 2>/dev/null) || true
-    # 版本号严格三段式校验, 防畸形版本行携带 markdown 注入 (security_review)
-    if [[ "$chg_ver" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-      chg_summary=$(printf '%s\n' "${chg_summary:-更新}" | sanitize_summary)
-      echo "- **${repo}** (${chg_ver}): ${chg_summary}" >> "$CHANGES_FILE"
-    else
-      echo "- **${repo}**: 无 CHANGELOG 版本记录" >> "$CHANGES_FILE"
-    fi
-  else
-    cmsg=$(git -C "$dest" log -1 --pretty='%s' 2>/dev/null || true)
-    cmsg=$(printf '%s\n' "${cmsg:-更新}" | sanitize_summary)
-    echo "- **${repo}**: ${cmsg}" >> "$CHANGES_FILE"
+  # ---- 记录相对上次安装包的真实增量，而不是反复显示最新正式版本的第一条 ----
+  if [ "$old_sha" = "$current_sha" ]; then
+    echo "  = 自上次 Release 无代码变化"
+    continue
   fi
+
+  old_available=false
+  if [[ "$old_sha" =~ ^[0-9a-fA-F]{7,64}$ ]] &&
+      git -C "$dest" cat-file -e "${old_sha}^{commit}" 2>/dev/null; then
+    old_available=true
+  fi
+
+  summaries=()
+  if [ "$old_available" = true ]; then
+    mapfile -t summaries < <(collect_changelog_delta "$dest" "$old_sha")
+    [ ${#summaries[@]} -eq 0 ] && mapfile -t summaries < <(collect_commit_delta "$dest" "$old_sha")
+    echo "- **${repo}** (\`${old_sha:0:8}\` → \`${current_sha:0:8}\`):" >> "$CHANGES_FILE"
+  else
+    mapfile -t summaries < <(collect_current_changelog "$dest")
+    [ ${#summaries[@]} -eq 0 ] && mapfile -t summaries < <(collect_commit_delta "$dest" "")
+    echo "- **${repo}** (首次记录基线 \`${current_sha:0:8}\`):" >> "$CHANGES_FILE"
+  fi
+  if [ ${#summaries[@]} -eq 0 ]; then
+    summaries=("已更新部署文件，子项目未提供文字说明")
+  fi
+  for summary in "${summaries[@]}"; do
+    echo "  - ${summary}" >> "$CHANGES_FILE"
+  done
 done < <(jq -r '.plugins[] | "\(.repo)|\(.ref // "master")"' plugins.json)
+
+[ -s "$CHANGES_FILE" ] || echo "（子项目提交未发生变化；本次仅更新安装器）" > "$CHANGES_FILE"
+jq -e '.schema == 1 and (.plugins | length > 0)' "$REVISIONS_FILE" >/dev/null || {
+  echo "错误: 未生成有效的子项目版本清单"; exit 1;
+}
 
 echo "== 收集完成, 共 $total 个文件 =="
 ls -la "$APP_DIR"

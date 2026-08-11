@@ -52,6 +52,10 @@ jobs:
           echo "VERSION=${BASE}.${BUILD}" >> "$GITHUB_ENV"
           echo "版本: ${BASE}.${BUILD}"
 
+      - name: 回归测试子插件更新记录
+        working-directory: repo
+        run: bash ci/test-release-notes.sh
+
       - name: 收集子项目部署资源
         working-directory: repo
         run: bash ci/assemble.sh

@@ -19,8 +19,9 @@ bin/
 obj/
 publish/
 
-# CI 运行时生成物 (assemble.sh 输出的子项目变更摘要)
+# CI 运行时生成物 (assemble.sh 输出的子项目变更摘要与版本基线)
 ci/_plugin_changes.md
+ci/_plugin_revisions.json
 dist/
 
 # IDE

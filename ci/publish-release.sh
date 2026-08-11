@@ -27,11 +27,23 @@ title="爱坤工具箱 v${VERSION}"
 
 # 读取子项目更新说明 (assemble.sh 生成); 缺失/为空时回退提示语
 CHANGES_FILE="$(dirname "$0")/_plugin_changes.md"
+REVISIONS_FILE="$(dirname "$0")/_plugin_revisions.json"
 if [ -f "$CHANGES_FILE" ] && [ -s "$CHANGES_FILE" ]; then
   PLUGIN_CHANGES=$(cat "$CHANGES_FILE")
 else
   PLUGIN_CHANGES="（本次无子项目变更详情）"
 fi
+
+# 版本清单是下一次构建计算增量的唯一可靠基线。缺失时拒绝发布，避免一次坏构建
+# 让后续 Release 永久失去子插件变更范围。base64 后放入 HTML 注释，不干扰人类阅读。
+if [ ! -f "$REVISIONS_FILE" ] ||
+    ! jq -e '.schema == 1 and (.plugins | type == "object") and (.plugins | length > 0)' \
+      "$REVISIONS_FILE" >/dev/null 2>&1; then
+  echo "错误: 子项目版本清单缺失或无效，拒绝发布"
+  exit 1
+fi
+REVISION_DATA=$(base64 < "$REVISIONS_FILE" | tr -d '\r\n')
+REVISION_MARKER="<!-- ikun-plugin-revisions:${REVISION_DATA} -->"
 
 body="$(cat <<EOF
 爱坤工具箱 NX 安装器 v${VERSION}
@@ -43,6 +55,8 @@ body="$(cat <<EOF
 ## 子项目更新内容
 
 ${PLUGIN_CHANGES}
+
+${REVISION_MARKER}
 EOF
 )"
 
