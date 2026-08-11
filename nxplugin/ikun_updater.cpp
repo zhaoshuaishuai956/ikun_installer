@@ -151,10 +151,8 @@ extern "C" __declspec(dllexport) void ufusr(char* param, int* retcod, int parm_l
         {
             ShowNxMsg("爱坤工具箱", "已有更新检查正在进行，请稍候。");
         }
-        else
-        {
-            ShowNxMsg("爱坤工具箱", "已启动更新检查，请查看弹出提示。");
-        }
+        // else: 已成功启动更新检查——不弹「已启动」提示, 由安装器 UpdateCheckForm 自行反馈
+        //       (有更新弹确认框 / 无更新 3 秒自动关闭)
     }
     catch (...) { }
     UF_terminate();
