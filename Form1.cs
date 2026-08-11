@@ -1,5 +1,13 @@
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Security.Principal;
 using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
 using Microsoft.Win32;
 
 namespace ikun_installer;
@@ -21,13 +29,27 @@ public partial class Form1 : Form
     // === 部署资源根命名空间 ===
     private const string ResourceRoot = "ikun_installer.DeployResources";
     private const string IkToolDir = @"D:\Program Files\ikun tools";
+    private const string UserRegistryPath = @"Software\ikun_tools";
+    private const string PendingNxPathValue = "pending_nx_install_root";
     private readonly string? _proxyArg;
 
-    public Form1(string? proxyArg = null)
+    public Form1(string? proxyArg = null, bool autoInstall = false)
     {
         _proxyArg = proxyArg;
         InitializeComponent();
         AutoDetectNx();
+        if (autoInstall)
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.CreateSubKey(UserRegistryPath);
+                var pending = key?.GetValue(PendingNxPathValue) as string;
+                if (!string.IsNullOrWhiteSpace(pending)) txtNxPath.Text = pending;
+                key?.DeleteValue(PendingNxPathValue, throwOnMissingValue: false);
+            }
+            catch { }
+            Shown += (_, _) => BeginInvoke(new Action(() => BtnInstall_Click(null, EventArgs.Empty)));
+        }
     }
 
     private void InitializeComponent()
@@ -163,7 +185,7 @@ public partial class Form1 : Form
         using var dlg = new FolderBrowserDialog
         {
             Description = "选择 NX 1847 安装根目录 (包含 UGII 子目录的文件夹)",
-            InitialDirectory = txtNxPath.Text
+            SelectedPath = Directory.Exists(txtNxPath.Text) ? txtNxPath.Text : ""
         };
         if (dlg.ShowDialog() == DialogResult.OK)
         {
@@ -188,7 +210,7 @@ public partial class Form1 : Form
                     var dir = key.GetValue("INSTALLDIR") as string;
                     if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
                     {
-                        txtNxPath.Text = dir.TrimEnd('\\');
+                        txtNxPath.Text = dir!.TrimEnd('\\');
                         Log($"注册表检测: {txtNxPath.Text}", Color.Green);
                         return;
                     }
@@ -311,15 +333,44 @@ public partial class Form1 : Form
         }
     }
 
-    /// <summary>用 icacls 收紧目录 ACL: Administrators/SYSTEM 完全控制, Users 只读 (防目录内文件被低权限用户替换)</summary>
-    private static void HardenDirAcl(string dir)
+    private static bool IsElevated()
     {
         try
         {
-            if (!Directory.Exists(dir)) return;
+            using var identity = WindowsIdentity.GetCurrent();
+            return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
+        }
+        catch { return false; }
+    }
+
+    private bool RelaunchElevatedForInstall()
+    {
+        try
+        {
+            using var current = Process.GetCurrentProcess();
+            var self = current.MainModule?.FileName;
+            if (string.IsNullOrWhiteSpace(self) || !File.Exists(self)) return false;
+            using (var key = Registry.CurrentUser.CreateSubKey(UserRegistryPath))
+                key?.SetValue(PendingNxPathValue, txtNxPath.Text.Trim(), RegistryValueKind.String);
+            Process.Start(new ProcessStartInfo(self, "--install")
+            {
+                UseShellExecute = true,
+                Verb = "runas"
+            });
+            return true;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>用 icacls 收紧目录 ACL: Administrators/SYSTEM 完全控制, Users 只读。</summary>
+    private static bool HardenDirAcl(string dir)
+    {
+        try
+        {
+            if (!Directory.Exists(dir)) return false;
             // icacls 用绝对路径, 防应用目录/CWD 的恶意同名 exe 劫持 (security HIGH)
             var icacls = Path.Combine(Environment.SystemDirectory, "icacls.exe");
-            if (!File.Exists(icacls)) return;
+            if (!File.Exists(icacls)) return false;
             // 使用 SID 形式避免本地化语言差异; /inheritance:r 去掉继承的宽松 ACL
             var psi = new ProcessStartInfo(icacls,
                 $"\"{dir}\" /inheritance:r " +
@@ -333,17 +384,38 @@ public partial class Form1 : Form
                 RedirectStandardError = true
             };
             using var p = Process.Start(psi);
-            p?.WaitForExit(15000);
+            if (p == null || !p.WaitForExit(15000)) return false;
+            return p.ExitCode == 0;
         }
-        catch { /* 非致命: 若 icacls 失败(非管理员), 安装流程继续 */ }
+        catch { return false; }
     }
 
     private async void BtnInstall_Click(object? sender, EventArgs e)
     {
+        var proxyInput = txtProxy.Text.Trim();
+        if (proxyInput.Length > 0 && UpdateManager.NormalizeProxy(proxyInput) == null)
+        {
+            MessageBox.Show("代理地址格式无效，应为 host:port 或留空。", "代理格式错误",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        UpdateManager.SaveProxy(proxyInput);
+
+        if (!IsElevated())
+        {
+            Log("安装需要管理员权限，正在请求 UAC 授权...", Color.DarkOrange);
+            if (RelaunchElevatedForInstall()) Application.Exit();
+            else MessageBox.Show("未获得管理员权限，安装尚未开始。", "需要管理员权限",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
         btnInstall.Enabled = false;
         txtLog.Clear();
         progressBar.Value = 0;
         int totalSteps = 5;
+        string? deploymentRoot = null;
+        bool registered = false;
 
         try
         {
@@ -351,8 +423,11 @@ public partial class Form1 : Form
             var nxUgii = Path.Combine(nxRoot, "UGII");
             var nxMenus = Path.Combine(nxUgii, "menus");
             var datFile = Path.Combine(nxMenus, "custom_dirs.dat");
-            var startupDir = Path.Combine(IkToolDir, "startup");
-            var appDir = Path.Combine(IkToolDir, "application");
+            var nxRunning = DeploymentLayout.IsNxRunning();
+            deploymentRoot = DeploymentLayout.CreateUniqueRoot(
+                IkToolDir, Application.ProductVersion);
+            var startupDir = Path.Combine(deploymentRoot, "startup");
+            var appDir = Path.Combine(deploymentRoot, "application");
 
             // 步骤1: 验证 NX 目录
             Log("[1/5] 验证 NX 目录...", Color.Black);
@@ -363,35 +438,24 @@ public partial class Form1 : Form
             Log($"  NX 路径验证通过: {nxUgii}", Color.Green);
             progressBar.Value = (int)(1.0 / totalSteps * 100);
 
-            // 步骤2: 创建爱坤工具箱目录
-            Log("\n[2/5] 创建爱坤工具箱目录...", Color.Black);
+            // 步骤2: 每次创建全新部署槽。绝不覆盖运行中 NX 已加载的 DLL。
+            Log("\n[2/5] 创建独立部署槽...", Color.Black);
             Directory.CreateDirectory(startupDir);
             Directory.CreateDirectory(appDir);
+            Log($"  NX 状态: {(nxRunning ? "正在运行，保留当前插件" : "未运行")}",
+                nxRunning ? Color.DarkOrange : Color.Green);
+            Log($"  {deploymentRoot}", Color.Green);
             Log($"  {startupDir}", Color.Green);
             Log($"  {appDir}", Color.Green);
             progressBar.Value = (int)(2.0 / totalSteps * 100);
-
-            // 步骤2.5: 收紧目录 ACL (仅 Administrators/SYSTEM 可写, Users 只读)
-            // 防低权限用户替换 ikun_installer.exe/插件 dll 后, 其他用户运行 NX 触发更新时执行恶意代码
-            Log("\n[2.5/5] 收紧目录权限...", Color.Black);
-            HardenDirAcl(startupDir);
-            HardenDirAcl(appDir);
-            HardenDirAcl(IkToolDir);
-            Log("  仅 Administrators/SYSTEM 可写 (Users 只读)", Color.Green);
 
             // 步骤3: 释放部署文件
             Log("\n[3/5] 释放部署文件...", Color.Black);
             await Task.Run(() => ExtractResources(startupDir, appDir));
             progressBar.Value = (int)(3.0 / totalSteps * 100);
 
-            // 步骤4: 注册到 NX
-            Log("\n[4/5] 注册到 NX custom_dirs.dat...", Color.Black);
-            Directory.CreateDirectory(nxMenus);
-            await Task.Run(() => RegisterCustomDirs(datFile));
-            progressBar.Value = (int)(4.0 / totalSteps * 100);
-
-            // 步骤5: 逐个验证文件
-            Log("\n[5/5] 验证安装...", Color.Black);
+            // 步骤4: 激活前先验证完整性，再收紧 ACL。不能先把目录改成只读后再写文件。
+            Log("\n[4/5] 验证部署并收紧权限...", Color.Black);
             var filesToCheck = new Dictionary<string, bool> {
                 { Path.Combine(startupDir, "custom.men"), true },
                 { Path.Combine(startupDir, "custom.tbr"), false },
@@ -422,25 +486,58 @@ public partial class Form1 : Form
                 throw new Exception($"核心文件缺失!\n\n{string.Join("\n", missing.Where(f => filesToCheck[f]))}");
             if (missing.Count > 0)
                 Log($"\n  警告: {missing.Count} 个非核心文件未生成, 功能可能受影响", Color.DarkOrange);
+
+            if (HardenDirAcl(deploymentRoot))
+                Log("  部署槽权限: Administrators/SYSTEM 可写，Users 只读", Color.Green);
+            else
+                Log("  警告: 未能收紧部署槽权限，文件已完整释放", Color.DarkOrange);
+            progressBar.Value = (int)(4.0 / totalSteps * 100);
+
+            // 步骤5: 同目录临时文件 + 原子替换。运行中的 NX 已读取旧配置，不受影响；
+            // 新启动的 NX 才读取新部署槽。
+            Log("\n[5/5] 原子切换 NX 注册路径...", Color.Black);
+            Directory.CreateDirectory(nxMenus);
+            await Task.Run(() => RegisterCustomDirs(datFile, deploymentRoot));
+            registered = true;
+
+            // 安装器固定放在根目录，供旧槽和新槽中的更新按钮共同调用。
+            var installerCopied = UpdateManager.SelfCopyToToolsDir(IkToolDir);
+            var installedExe = Path.Combine(IkToolDir, UpdateManager.AssetName);
+            Log(installerCopied
+                ? $"  安装器已就位: {installedExe}"
+                : "  警告: 安装器文件正被占用，插件仍已成功安装；稍后重新运行可更新安装器本体",
+                installerCopied ? Color.DarkGray : Color.DarkOrange);
+            if (!HardenDirAcl(IkToolDir))
+                Log("  警告: 未能收紧工具箱根目录权限", Color.DarkOrange);
+
+            if (nxRunning)
+                Log("  NX 正在运行：旧部署槽保持不动，下次启动自动切换", Color.Blue);
+            else
+                Log("  旧部署槽已保留，可用于安全回退；不会覆盖或删除已加载 DLL", Color.DarkGray);
             progressBar.Value = 100;
 
             Log("\n========================================", Color.Green);
             Log("  爱坤工具箱 安装成功!", Color.Green);
             Log("========================================", Color.Green);
-            Log("使用: 重启 NX 1847 -> Help 右侧 -> 爱坤工具箱", Color.Blue);
-
-            // 安装器自复制到 ikun tools 目录, 供 NX 侧「检查更新」按钮调用
-            UpdateManager.SelfCopyToToolsDir(IkToolDir);
-            Log($"  安装器已就位: {Path.Combine(IkToolDir, UpdateManager.AssetName)}", Color.DarkGray);
+            Log(nxRunning
+                ? "NX 无需现在关闭；新版本将在下次启动 NX 时生效。"
+                : "启动 NX 1847 后，在 Help 右侧使用爱坤工具箱。", Color.Blue);
 
             MessageBox.Show(
-                "安装成功!\n\n重启 NX 1847 后, 在菜单栏 Help 右侧\n点击「爱坤工具箱」即可使用。",
+                nxRunning
+                    ? "安装成功！\n\n当前 NX 可以继续使用，不需要关闭。\n新插件将在下次启动 NX 时自动生效。"
+                    : "安装成功！\n\n启动 NX 1847 后，在菜单栏 Help 右侧\n点击「爱坤工具箱」即可使用。",
                 "安装完成",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
         }
         catch (Exception ex)
         {
+            if (!registered && !string.IsNullOrEmpty(deploymentRoot))
+            {
+                try { if (Directory.Exists(deploymentRoot)) Directory.Delete(deploymentRoot, recursive: true); }
+                catch { }
+            }
             Log($"\n✗ 安装失败: {ex.Message}", Color.Red);
             MessageBox.Show(
                 $"安装失败:\n\n{ex.Message}",
@@ -513,40 +610,14 @@ public partial class Form1 : Form
         Log($"  已释放 {extracted} 个文件 (跳过 {skipped} 个)", Color.Green);
     }
 
-    private void RegisterCustomDirs(string datFile)
+    private void RegisterCustomDirs(string datFile, string activeRoot)
     {
-        var lines = new List<string>();
-        if (File.Exists(datFile))
-        {
-            lines.AddRange(File.ReadAllLines(datFile, Encoding.UTF8)
-                .Where(l => !string.IsNullOrWhiteSpace(l)));
-        }
-
-        // 清理旧注册
-        var newLines = new List<string>();
-        bool skip = false;
-        foreach (var line in lines)
-        {
-            if (line == "# ikun_tools" || line == "# nx_tools_deploy" ||
-                line == @"E:\NX二次开发\项目\nx_tools_deploy")
-            {
-                skip = true;
-                continue;
-            }
-            if (skip && line.StartsWith(@"D:\") || skip && line.StartsWith(@"E:\"))
-            {
-                skip = false;
-                if (line != IkToolDir) newLines.Add(line);
-                continue;
-            }
-            if (!skip) newLines.Add(line);
-        }
-
-        newLines.Add("");
-        newLines.Add("# ikun_tools");
-        newLines.Add(IkToolDir);
-        File.WriteAllLines(datFile, newLines, new UTF8Encoding(false));
-        Log($"  已注册: {IkToolDir}", Color.Green);
+        var lines = File.Exists(datFile)
+            ? File.ReadAllLines(datFile, Encoding.UTF8)
+            : Array.Empty<string>();
+        var updated = DeploymentLayout.BuildCustomDirs(lines, IkToolDir, activeRoot);
+        DeploymentLayout.WriteCustomDirsAtomic(datFile, updated);
+        Log($"  已注册: {activeRoot}", Color.Green);
     }
 
     private void Log(string msg, Color color)

@@ -19,7 +19,7 @@ static class Program
             return;
         }
 
-        Application.Run(new Form1(proxyArg));
+        Application.Run(new Form1(proxyArg, args.Contains("--install")));
     }
 
     /// <summary>从参数里取 --proxy 的下一段; 无则 null</summary>

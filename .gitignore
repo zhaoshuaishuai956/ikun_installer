@@ -18,6 +18,7 @@ refint/
 bin/
 obj/
 publish/
+tests/bin_manual/
 
 # CI 运行时生成物 (assemble.sh 输出的子项目变更摘要与版本基线)
 ci/_plugin_changes.md

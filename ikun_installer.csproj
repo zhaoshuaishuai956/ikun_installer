@@ -8,6 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyTitle>爱坤工具箱 NX 安装器</AssemblyTitle>
     <ApplicationIcon>ikun-tools.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>ikun_installer</AssemblyName>
     <Version>2.1.0</Version>
     <!-- 自包含发布 + 只保留中文语言资源 -->
@@ -27,6 +28,10 @@
     <EmbeddedResource Include="DeployResources\startup\**\*" />
     <EmbeddedResource Include="DeployResources\application\**\*" />
     <EmbeddedResource Include="nxplugin\ikun_updater.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="tests\**\*.cs" />
   </ItemGroup>
 
 </Project>

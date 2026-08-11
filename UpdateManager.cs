@@ -305,17 +305,18 @@ public static class UpdateManager
     }
 
     /// <summary>安装成功后把安装器自身复制到 ikun tools 目录, 供 NX 侧按钮调用</summary>
-    public static void SelfCopyToToolsDir(string toolsDir)
+    public static bool SelfCopyToToolsDir(string toolsDir)
     {
         try
         {
             var self = Environment.ProcessPath;
-            if (string.IsNullOrEmpty(self)) return;
+            if (string.IsNullOrEmpty(self)) return false;
             var target = Path.Combine(toolsDir, AssetName);
-            if (string.Equals(self, target, StringComparison.OrdinalIgnoreCase)) return;
+            if (string.Equals(self, target, StringComparison.OrdinalIgnoreCase)) return true;
             Directory.CreateDirectory(toolsDir);
             File.Copy(self, target, overwrite: true);
+            return File.Exists(target) && new FileInfo(target).Length == new FileInfo(self).Length;
         }
-        catch { /* 非致命: NX 按钮找不到 exe 时会提示先运行安装器 */ }
+        catch { return false; /* 非致命: 插件部署与安装器自更新彼此隔离 */ }
     }
 }
