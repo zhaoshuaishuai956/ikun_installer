@@ -50,22 +50,29 @@ public sealed class UpdateCheckForm : Form
         Controls.Add(_progress);
         Controls.Add(_btnClose);
 
-        Shown += async (_, _) => await RunCheckAsync();
+        // 外层 try/catch: 下载中关窗等竞态可能抛 ObjectDisposedException, 静默兜底
+        Shown += async (_, _) => { try { await RunCheckAsync(); } catch { } };
     }
 
     private async Task RunCheckAsync()
     {
-        // 代理: 命令行 --proxy 优先, 否则注册表; 无则默认(与 GUI 默认一致)
+        // 代理: 命令行 --proxy 优先, 否则注册表; 从未设置才用默认(显式清空=直连)
         var proxy = _proxyArg ?? UpdateManager.ReadProxy() ?? UpdateManager.DefaultProxy;
         var local = UpdateManager.GetLocalVersion();
         UpdateManager.RemoteRelease? remote;
         try
         {
-            remote = await UpdateManager.CheckForUpdateAsync(proxy, local);
+            remote = await UpdateManager.FetchRemoteAsync(proxy);
         }
         catch { remote = null; }
 
         if (remote == null)
+        {
+            _lblStatus.Text = "检查失败: 无法连接 Gitea 或解析版本信息";
+            _btnClose.Enabled = true;
+            return;
+        }
+        if (!UpdateManager.IsNewer(remote.Version, local))
         {
             _lblStatus.Text = $"已是最新版本 (v{local})";
             _btnClose.Enabled = true;

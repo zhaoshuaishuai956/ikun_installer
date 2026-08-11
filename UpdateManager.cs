@@ -23,8 +23,6 @@ public static class UpdateManager
     public const string GiteaLatestApi = "https://gt.h.zss.fan:2233/api/v1/repos/zhaoshen/ikun_installer/releases/tags/latest";
     public const string AssetName = "ikun_installer.exe";
 
-    private static readonly HttpClient Client = CreateClient(null); // 基础客户端, 代理在请求级替换
-
     /// <summary>远端 release 信息</summary>
     public sealed record RemoteRelease(Version Version, string DownloadUrl, long Size);
 
@@ -65,14 +63,15 @@ public static class UpdateManager
 
     // === 代理 ===
 
-    /// <summary>读注册表代理; 无配置返回 null(直连)。GUI 默认值由调用方按 DefaultProxy 处理</summary>
+    /// <summary>读注册表代理: null=从未设置(调用方可给默认值); ""=用户显式清空(直连); 其他=代理地址</summary>
     public static string? ReadProxy()
     {
         try
         {
             using var key = Registry.CurrentUser.OpenSubKey(RegistryKeyPath);
-            var v = key?.GetValue("proxy") as string;
-            return string.IsNullOrWhiteSpace(v) ? null : v.Trim();
+            if (key == null) return null;   // 从未设置
+            var v = key.GetValue("proxy") as string;
+            return string.IsNullOrWhiteSpace(v) ? "" : v.Trim();  // 已设置: 空=显式直连
         }
         catch { return null; }
     }
@@ -223,7 +222,8 @@ public static class UpdateManager
         catch { return false; }
     }
 
-    /// <summary>有更新且可下载时返回 RemoteRelease, 否则 null</summary>
+    /// <summary>有更新且可下载时返回 RemoteRelease, 否则 null。
+    ///  注意: 网络失败/解析失败与无更新均返回 null, 调用方需要区分时请用 FetchRemoteAsync + IsNewer。</summary>
     public static async Task<RemoteRelease?> CheckForUpdateAsync(string? proxy, Version? local = null, CancellationToken ct = default)
     {
         var cur = local ?? GetLocalVersion();
@@ -269,6 +269,7 @@ public static class UpdateManager
                     progress.Report(Math.Min(1.0, (double)total / expected));
             }
             await fs.FlushAsync(ct);
+            await fs.DisposeAsync();  // 必须先释放文件句柄(FileShare.None), 否则后续校验/删除打开会冲突
 
             if (total != expected)
             {

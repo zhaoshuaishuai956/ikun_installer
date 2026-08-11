@@ -13,7 +13,7 @@
 <PropertyList id="id" mode="0">
 <Property id="API Name" mask="16656" name="API Name" type="string" group="General::" sname="BlockID" value="LBL_INFO" source="3" ClassID="UGS::UICOMP" hierarchy="UGS::UICOMP_label"/>
 <Property id="Visibility" mask="0" name="Visibility" type="logical" group="General::" sname="Show" value="True" source="1" ClassID="UGS::UICOMP" hierarchy="UGS::UICOMP_label"/>
-<Property id="Title" mask="256" name="Title" type="utfstring" group="General::" sname="Label" value="选模具体/顶针板上面/加热管 -> 设阵列方式 -> 视图点落点(自动加入) -> 确定生成" source="1" ClassID="UGS::UICOMP" hierarchy="UGS::UICOMP_label"/>
+<Property id="Title" mask="256" name="Title" type="utfstring" group="General::" sname="Label" value="点落点: 与已有顶针水平/竖直自动对齐吸附(按住 Alt 临时取消); 鼠标停在实体点上一会可捕获参考点, 移动显示追踪虚线 -> 确定生成" source="1" ClassID="UGS::UICOMP" hierarchy="UGS::UICOMP_label"/>
 </PropertyList>
 </item>
 </Property>

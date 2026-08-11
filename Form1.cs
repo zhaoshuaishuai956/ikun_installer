@@ -234,20 +234,21 @@ public partial class Form1 : Form
 
     private async void BtnCheckUpdate_Click(object? sender, EventArgs e)
     {
-        // 保存代理配置(供 NX 侧按钮复用)
-        UpdateManager.SaveProxy(txtProxy.Text.Trim());
         btnCheckUpdate.Enabled = false;
         try
         {
             Log("\n== 检查更新 ==", Color.Black);
-            var proxy = UpdateManager.NormalizeProxy(txtProxy.Text.Trim());
-            if (txtProxy.Text.Trim().Length > 0 && proxy == null)
+            // 先校验代理格式, 通过后才持久化(防无效值被写进注册表)
+            var proxyInput = txtProxy.Text.Trim();
+            var proxy = UpdateManager.NormalizeProxy(proxyInput);
+            if (proxyInput.Length > 0 && proxy == null)
             {
-                Log($"  代理格式无效: {txtProxy.Text.Trim()} (应为 host:port 或 scheme://host:port)", Color.Red);
+                Log($"  代理格式无效: {proxyInput} (应为 host:port 或 scheme://host:port)", Color.Red);
                 MessageBox.Show("代理地址格式无效, 应为 host:port (如 192.168.1.5:6666) 或留空", "代理格式错误",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
+            UpdateManager.SaveProxy(proxyInput);  // 校验通过后保存(供 NX 侧按钮复用)
             var local = UpdateManager.GetLocalVersion();
             Log($"  本地版本: v{local}  代理: {(proxy ?? "(直连)")}", Color.DarkGray);
 

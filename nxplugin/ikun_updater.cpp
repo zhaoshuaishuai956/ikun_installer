@@ -8,15 +8,37 @@
  *        版本对比/下载/更新安装对话框全部由安装器完成。
  * ============================================================ */
 #include <windows.h>
+#ifdef CreateDialog
+#undef CreateDialog   /* 避免与 NXOpen::UI::CreateDialog 冲突 (UI.hxx 明确要求) */
+#endif
+#ifdef max
+#undef max
+#endif
 #include <uf.h>
 #include <uf_ui.h>
+#include <NXOpen/UI.hxx>
+#include <NXOpen/NXMessageBox.hxx>
+#include <NXOpen/NXString.hxx>
 #include <cstdio>
 #include <cstring>
 #include <string>
 
+using namespace NXOpen;
+
 static const char* IKUN_EXE = "D:\\Program Files\\ikun tools\\ikun_installer.exe";
 static const char* REG_KEY  = "Software\\ikun_tools";
 static const char* REG_VAL  = "proxy";
+
+// 显示 NX 消息框: 用 NXMessageBox(按 UTF-8 显示), 不能用 uc1601(UF 层期望 ANSI/GBK,
+// UTF-8 字符串会乱码——踩坑总结「中文编码」)。NX 会话异常时静默。
+static void ShowNxMsg(const char* title, const char* msg)
+{
+    try
+    {
+        UI::GetUI()->NXMessageBox()->Show(title, NXMessageBox::DialogTypeInformation, msg);
+    }
+    catch (...) { }
+}
 
 // 读注册表代理(空=直连); 结果只保留白名单字符, 防 CreateProcess 参数注入
 static std::string ReadProxyConfig()
@@ -123,15 +145,15 @@ extern "C" __declspec(dllexport) void ufusr(char* param, int* retcod, int parm_l
             char msg[512] = {};
             snprintf(msg, sizeof(msg),
                 "未找到安装器:\n%s\n\n请先运行爱坤工具箱安装器 (ikun_installer.exe) 完成安装。", IKUN_EXE);
-            uc1601(msg, 1);
+            ShowNxMsg("爱坤工具箱", msg);
         }
         else if (!LaunchUpdateCheckOnce())
         {
-            uc1601("已有更新检查正在进行，请稍候。", 1);
+            ShowNxMsg("爱坤工具箱", "已有更新检查正在进行，请稍候。");
         }
         else
         {
-            uc1601("已启动更新检查，请查看弹出提示。", 1);
+            ShowNxMsg("爱坤工具箱", "已启动更新检查，请查看弹出提示。");
         }
     }
     catch (...) { }

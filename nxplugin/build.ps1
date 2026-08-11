@@ -43,11 +43,11 @@ Write-Host "[1/2] 编译 $Name.cpp ..." -ForegroundColor Cyan
     /I"$NxOpen" "$Proj\$Name.cpp" /Fo"$Proj\$Name.obj"
 if ($LASTEXITCODE -ne 0) { throw "编译失败 (cl exit $LASTEXITCODE)" }
 
-# ---- 链接 (UF API: libufun.lib + libugopenint.lib; 注册表 API: advapi32.lib) ----
+# ---- 链接 (UF API: libufun.lib + libugopenint.lib; NXOpen UI 消息框: libnxopenuicpp.lib; 注册表: advapi32.lib) ----
 Write-Host "[2/2] 链接 $Name.dll ..." -ForegroundColor Cyan
 & link /nologo /DLL /MACHINE:X64 `
     /OUT:"$Proj\$Name.dll" /LIBPATH:"$NxOpen" `
-    "$Proj\$Name.obj" libufun.lib libugopenint.lib advapi32.lib
+    "$Proj\$Name.obj" libufun.lib libugopenint.lib libnxopenuicpp.lib advapi32.lib
 if ($LASTEXITCODE -ne 0) { throw "链接失败 (link exit $LASTEXITCODE)" }
 
 # ---- 清理副产物 ----
