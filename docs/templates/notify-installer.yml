@@ -1,0 +1,27 @@
+name: notify-installer
+# 本插件更新(制品 dll/dlx/dat 变更)后, 触发爱坤工具箱安装器(ikun_installer)在 rock5t 上重新打包
+# 权威模板: ikun_installer/docs/templates/notify-installer.yml (规范 §8.2)
+# 允许的唯一定制: on.push.paths 列表 (按本仓制品扩展名调整, 如含 .def 的插件把 **.dat 换 **.def)
+# 定制时必须在本注释注明: 模板: <路径>, 定制: paths=<扩展名>
+# 禁止改动: dispatch 端点 / secret 名 / 分支名 / curl 参数(-k 禁止, 规范 §11.6)
+on:
+  push:
+    branches: [master]
+    paths:
+      - '**.dll'
+      - '**.dlx'
+      - '**.dat'
+jobs:
+  notify:
+    runs-on: dotnet
+    steps:
+      - name: 触发安装器打包
+        run: |
+          set -e
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -X POST \
+            -H "Authorization: token ${{ secrets.INSTALLER_DISPATCH_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"ref":"master"}' \
+            "https://gt.h.zss.fan:2233/api/v1/repos/zhaoshen/ikun_installer/actions/workflows/pack.yml/dispatches")
+          echo "dispatch HTTP $code"
+          case "$code" in 200|204) echo "已触发安装器打包";; *) echo "触发失败 HTTP $code"; exit 1;; esac

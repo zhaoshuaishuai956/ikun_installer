@@ -15,8 +15,16 @@ APP="DeployResources/application"
 mkdir -p "$STARTUP"
 
 missing=()
-while IFS='|' read -r repo icon; do
+META_TSV="ci/_plugin_meta.tsv"
+[ -f "$META_TSV" ] || { echo "错误: 缺少 $META_TSV (须先运行 assemble.sh, 规范 M4)"; exit 1; }
+# M4: 图标文字来自各仓 plugin.meta 的 icon_cn (assemble.sh 导出的 meta 摘要), 不再读 plugins.json
+while IFS='|' read -r repo name icon category inikun; do
   [ -z "$repo" ] && continue
+  # 白名单校验 (规范 §4.2/§11.3): 1-2 汉字或 1-3 大写字母, 防 ImageMagick @/% 注入
+  if ! printf '%s' "$icon" | python3 -c 'import re,sys; s=sys.stdin.read().strip(); sys.exit(0 if re.fullmatch(r"[\u4e00-\u9fff]{1,2}|[A-Z]{1,3}", s) else 1)'; then
+    echo "  !! 拒绝非法 icon_cn [$icon] (白名单: 1-2 汉字或 1-3 大写字母, 规范 §4.2/§11.3)"
+    icon="?"
+  fi
   # 找该插件的 dll 基名: 优先 <repo>.dll, 否则取以 repo 开头的第一个 dll
   dll=""
   if [ -f "$APP/$repo.dll" ]; then
@@ -27,7 +35,7 @@ while IFS='|' read -r repo icon; do
   [ -z "$dll" ] && { echo "  跳过 $repo (application 里无对应 dll)"; continue; }
   bmp="$STARTUP/ikun_${dll}.bmp"
   [ -f "$bmp" ] || missing+=("${bmp}|${icon}")
-done < <(jq -r '.plugins[] | "\(.repo)|\(.icon // "")"' plugins.json)
+done < "$META_TSV"
 
 if [ ${#missing[@]} -eq 0 ]; then
   echo "工具栏图标齐全, 无需生成"

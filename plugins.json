@@ -1,13 +1,13 @@
 {
-  "_comment": "爱坤工具箱要打包的子项目清单。CI(rock5t)按此列表逐个 clone 子仓库，收集其部署资源到 DeployResources/application，再编译单文件 exe 并发布 Release。新增插件在此登记，并同步在 DeployResources/startup 里加菜单/图标。",
+  "_comment": "爱坤工具箱要打包的子项目清单。CI(rock5t)按此列表逐个 clone 子仓库，收集其部署资源到 DeployResources/application，再编译单文件 exe 并发布 Release。新增插件在此登记，并同步在 DeployResources/startup 里加菜单/图标。图标文字来自各仓 plugin.meta 的 icon_cn（规范 M4：gen-icons 读 ci/_plugin_meta.tsv），本文件不再持有 icon 字段。",
   "release_tag": "latest",
   "plugins": [
-    { "repo": "MultiEntityNester",  "ref": "master", "icon": "排样" },
-    { "repo": "block_boss_layout",  "ref": "master", "icon": "凸台" },
-    { "repo": "ejector_layout",     "ref": "master", "icon": "顶针" },
-    { "repo": "pmi_hole_dim",       "ref": "master", "icon": "PMI"  },
-    { "repo": "single_line_text",   "ref": "master", "icon": "刻字" },
-    { "repo": "text_auto_layout",   "ref": "master", "icon": "排版" },
-    { "repo": "plate_dwg_export",   "ref": "master", "icon": "板面" }
+    { "repo": "MultiEntityNester",  "ref": "master" },
+    { "repo": "block_boss_layout",  "ref": "master" },
+    { "repo": "ejector_layout",     "ref": "master" },
+    { "repo": "pmi_hole_dim",       "ref": "master" },
+    { "repo": "single_line_text",   "ref": "master" },
+    { "repo": "text_auto_layout",   "ref": "master" },
+    { "repo": "plate_dwg_export",   "ref": "master" }
   ]
 }

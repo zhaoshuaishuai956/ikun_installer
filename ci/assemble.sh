@@ -25,6 +25,7 @@ RELEASE_TAG="${RELEASE_TAG:-latest}"
 APP_DIR="DeployResources/application"
 CHANGES_FILE="$SCRIPT_DIR/_plugin_changes.md"
 REVISIONS_FILE="$SCRIPT_DIR/_plugin_revisions.json"
+META_TSV="$SCRIPT_DIR/_plugin_meta.tsv"   # M4/M7b: 供 G5 校验与 gen-icons 消费 (pack.yml 步骤间 handoff)
 API="https://${HOST}/api/v1/repos/${OWNER}/${INSTALLER_REPO}"
 
 : "${PAT:?需要 PAT 环境变量(克隆子仓库)}"
@@ -61,6 +62,7 @@ echo "== 重建 $APP_DIR =="
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR"
 : > "$CHANGES_FILE"   # 清空子项目变更摘要
+: > "$META_TSV"       # 清空 meta 摘要 (M4/M7b)
 
 total=0
 no_files_repos=()   # G1: 收集不到部署文件的在册插件 (规范 §7.3)
@@ -87,6 +89,19 @@ while IFS='|' read -r repo ref; do
   jq --arg repo "$repo" --arg ref "$ref" --arg sha "$current_sha" \
     '.plugins[$repo] = {ref:$ref, sha:$sha}' "$REVISIONS_FILE" > "$revision_tmp"
   mv "$revision_tmp" "$REVISIONS_FILE"
+
+  # M4/M7b: 导出 meta 摘要 (repo|name_cn|icon_cn|category|in_ikun) 供 G5 一致性校验与 gen-icons 消费
+  meta_line=""
+  if [ -f "$dest/plugin.meta" ]; then
+    meta_name=$(grep -E '^name_cn=' "$dest/plugin.meta" | head -1 | cut -d= -f2- | tr -d '\r')
+    meta_icon=$(grep -E '^icon_cn=' "$dest/plugin.meta" | head -1 | cut -d= -f2- | tr -d '\r')
+    meta_cat=$(grep -E '^category=' "$dest/plugin.meta" | head -1 | cut -d= -f2- | tr -d '\r')
+    meta_in=$(grep -E '^in_ikun=' "$dest/plugin.meta" | head -1 | cut -d= -f2- | tr -d '\r')
+    meta_line="${repo}|${meta_name:-}|${meta_icon:-}|${meta_cat:-}|${meta_in:-}"
+  else
+    meta_line="${repo}||||"
+  fi
+  printf '%s\n' "$meta_line" >> "$META_TSV"
 
   globs=()
   if [ -f "$dest/ikun-deploy.txt" ]; then
@@ -118,6 +133,17 @@ while IFS='|' read -r repo ref; do
   if [ "$n" -eq 0 ]; then
     echo "  !! 警告: $repo 未匹配到任何部署文件"
     no_files_repos+=("$repo")   # G1 升级: 在册插件收集不到文件 → 打包失败 (规范 §7.3)
+  else
+    # G8 阶段一 (规范 M14): 制品内嵌插件仓构建 SHA 与 HEAD 比对 (仅警告, 存量宽限一个周期)
+    if [ -n "$current_sha" ]; then
+      sha_short="${current_sha:0:7}"
+      for f in "$APP_DIR"/"$repo"*.dll; do
+        [ -f "$f" ] || continue
+        if ! strings "$f" 2>/dev/null | grep -qF "$sha_short"; then
+          echo "  !! G8(阶段一): $(basename "$f") 未内嵌构建 SHA $sha_short (规范 M14; 新模板自动内嵌)"
+        fi
+      done
+    fi
   fi
 
   # ---- 记录相对上次安装包的真实增量，而不是反复显示最新正式版本的第一条 ----

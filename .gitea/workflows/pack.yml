@@ -27,13 +27,15 @@ jobs:
       GITEA_REPO: ikun_installer
       RELEASE_TAG: latest
     steps:
-      - name: 准备工具 (jq)
+      - name: 准备工具 (jq/binutils/libxml2-utils/python3)
         run: |
           set -e
           if ! command -v jq >/dev/null; then
             apt-get update -qq && apt-get install -y -qq jq >/dev/null
           fi
-          echo "jq $(jq --version), dotnet $(dotnet --version)"
+          # G 系闸门工具 (规范 M7b): objdump(PE 导出), xmllint(dlx XML), python3(G5/G7), strings(G8)
+          apt-get update -qq && apt-get install -y -qq binutils libxml2-utils python3 >/dev/null
+          echo "jq $(jq --version), objdump $(objdump --version | head -1), xmllint $(xmllint --version 2>&1 | head -1), python3 $(python3 --version)"
 
       - name: 拉取安装器仓库
         run: |
@@ -64,6 +66,14 @@ jobs:
       - name: 生成缺失的工具栏图标
         working-directory: repo
         run: bash ci/gen-icons.sh
+
+      - name: 闸门 G2/G3/G6 (规范 §7.3)
+        working-directory: repo
+        run: bash ci/gates.sh
+
+      - name: 闸门 G5/G7 一致性 (规范 §7.3)
+        working-directory: repo
+        run: python3 ci/check_consistency.py
 
       - name: 交叉编译单文件 exe (win-x64)
         working-directory: repo

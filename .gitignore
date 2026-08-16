@@ -20,10 +20,14 @@ obj/
 publish/
 tests/bin_manual/
 
-# CI 运行时生成物 (assemble.sh 输出的子项目变更摘要与版本基线)
+# CI 运行时生成物 (assemble.sh 输出的子项目变更摘要/版本基线/meta 摘要)
 ci/_plugin_changes.md
 ci/_plugin_revisions.json
+ci/_plugin_meta.tsv
 dist/
+
+# 部署资源由 CI assemble 或 scripts/dev-assemble.ps1 本地重建 (规范 M5), 不入库
+DeployResources/application/
 
 # IDE
 .vscode/
