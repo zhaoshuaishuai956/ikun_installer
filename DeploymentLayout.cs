@@ -16,6 +16,12 @@ public static class DeploymentLayout
     public const string Marker = "# ikun_tools";
     private const string LegacyMarker = "# nx_tools_deploy";
 
+    /// <summary>
+    /// legacy 检测路径 (规范 M6): 由宿主程序启动时从 AppConfig 注入 (Program.Main),
+    /// 默认值兼容旧 custom_dirs.dat。放在本类避免纯逻辑依赖注册表 → 测试可在 CI 容器跑。
+    /// </summary>
+    public static string LegacyDeployDir { get; set; } = @"E:\NX二次开发\项目\nx_tools_deploy";
+
     public static string CreateUniqueRoot(string toolsDir, string version,
         DateTime? now = null, string? nonce = null)
     {
@@ -59,9 +65,8 @@ public static class DeploymentLayout
             var normalized = line.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             if (normalized.Equals(toolsFull, StringComparison.OrdinalIgnoreCase) ||
                 normalized.StartsWith(deployments, StringComparison.OrdinalIgnoreCase) ||
-                // M6: legacy 检测路径可配置 (规范 §11.4); 默认值兼容旧 custom_dirs.dat
-                normalized.Equals(AppConfig.GetString("legacy_nx_deploy_dir",
-                    @"E:\NX二次开发\项目\nx_tools_deploy"), StringComparison.OrdinalIgnoreCase))
+                // M6: legacy 检测路径可配置 (规范 §11.4; 由 Program.Main 从 AppConfig 注入)
+                normalized.Equals(LegacyDeployDir, StringComparison.OrdinalIgnoreCase))
                 continue;
             if (line.Length > 0) result.Add(original);
         }

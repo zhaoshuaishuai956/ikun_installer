@@ -12,6 +12,10 @@ static class Program
     {
         ApplicationConfiguration.Initialize();
 
+        // M6: 运行时可配置项注入 (规范 §11.4; 注册表>环境变量>默认值)
+        DeploymentLayout.LegacyDeployDir = AppConfig.GetString(
+            "legacy_nx_deploy_dir", @"E:\NX二次开发\项目\nx_tools_deploy");
+
         var proxyArg = ExtractProxyArg(args);
         if (args.Contains("--check-update"))
         {

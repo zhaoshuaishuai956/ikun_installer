@@ -9,12 +9,16 @@ on:
       - ikun_installer.csproj
       - Form1.cs
       - Program.cs
+      - AppConfig.cs
+      - Versioning.cs
+      - DeploymentLayout.cs
       - UpdateManager.cs
       - UpdateCheckForm.cs
       - plugins.json
       - CHANGELOG.md
       - ci/**
       - nxplugin/**
+      - tests/**
       - DeployResources/startup/**
 
 jobs:

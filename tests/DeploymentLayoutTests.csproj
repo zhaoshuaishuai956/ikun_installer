@@ -12,11 +12,5 @@
   <ItemGroup>
     <Compile Include="..\Versioning.cs" Link="src\Versioning.cs" />
     <Compile Include="..\DeploymentLayout.cs" Link="src\DeploymentLayout.cs" />
-    <!-- DeploymentLayout 引用 AppConfig(注册表, 运行时非 Windows 回退环境变量), 一并链接 -->
-    <Compile Include="..\AppConfig.cs" Link="src\AppConfig.cs" />
-  </ItemGroup>
-  <!-- 注册表类型在 net9.0(非 -windows) 下需要显式包; 运行时非 Windows 抛 PlatformNotSupported → AppConfig 已兜底 -->
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Win32.Registry" Version="5.0.0" />
   </ItemGroup>
 </Project>
