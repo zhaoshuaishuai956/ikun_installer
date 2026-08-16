@@ -1,4 +1,4 @@
-# Gitea Workflow — AI Agent 系统指令
+﻿# Gitea Workflow — AI Agent 系统指令
 
 本文件是通用 Markdown 格式的可执行系统指令，适用于所有主流 AI 编程助手。不含占位符，每个指令须被无条件执行。
 
@@ -439,9 +439,8 @@ curl -sS -X POST "https://${GITEA_HOST}/api/v1/repos/${OWNER}/${REPO}/pulls" \
 
 ## 11. 参考文档
 
-本文件是权威行为规则。以下文档提供详细参考：
-- `docs/dev-standards.md` — 通用 AI Agent 开发规范（8 领域）
-- `docs/commit-guide.md` — 20+ 场景 commit 示例，多 Agent Co-Authored-By 签名表
-- `docs/api-cheatsheet.md` — 6 个核心 API 端点的 curl 参考
-- `docs/troubleshooting.md` — 详细诊断命令和边缘案例
-- `docs/setup.md` — 人类阅读：Gitea 安装 + 各 AI 工具配置指南
+本文件是权威行为规则。详细文档按规范 §2.2 分层存放于各权威源：
+- L3 整体规范（最高优先）：`ikun_dev_standard` 仓库 `ikun-整体开发规范-v1.0.md`
+- L1 工作流：`gitea-for-ai` 仓库 `docs/`（dev-standards.md / commit-guide.md / api-cheatsheet.md / troubleshooting.md / setup.md）
+- L2 知识库：`nx_dev_skill`（私有权威）/ `nx_dev_handbook`（公开镜像）
+

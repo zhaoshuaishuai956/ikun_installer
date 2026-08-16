@@ -12,3 +12,8 @@
 *.md    text
 *.json  text
 *.txt   text
+
+# NX 菜单/工具栏文件是 GBK 编码, 禁止 autocrlf/文本归一化改写 (规范 C1/M2)
+*.men  binary
+*.rtb  binary
+*.tbr  binary
