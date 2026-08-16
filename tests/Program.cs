@@ -45,40 +45,50 @@ try
     var lockedDll = Path.Combine(oldRoot, "application", "MultiEntityNester.dll");
     File.WriteAllText(lockedDll, "old-loaded-dll");
 
-    using (var nxLock = new FileStream(lockedDll, FileMode.Open, FileAccess.Read, FileShare.Read))
+    // 部署槽测试 (CI 容器为 linux: FileShare 锁是 Windows 语义, 非 Windows 跳过占用断言)
+    var newRoot = DeploymentLayout.CreateUniqueRoot(tools, "2.1.0.52",
+        new DateTime(2026, 8, 11, 22, 0, 0), "abc12345");
+    Require(!newRoot.Equals(oldRoot, StringComparison.OrdinalIgnoreCase), "新旧部署槽发生碰撞");
+    var newApp = Path.Combine(newRoot, "application");
+    Directory.CreateDirectory(newApp);
+    File.WriteAllText(Path.Combine(newApp, "MultiEntityNester.dll"), "new-dll");
+
+    var existing = new[] {
+        @"C:\OtherNxTool",
+        "# ikun_tools",
+        oldRoot,
+        @"D:\IndependentTool"
+    };
+    var updated = DeploymentLayout.BuildCustomDirs(existing, tools, newRoot);
+    Require(updated.Contains(@"C:\OtherNxTool"), "误删其他 NX 工具路径");
+    Require(updated.Contains(@"D:\IndependentTool"), "误删独立 D 盘工具路径");
+    Require(!updated.Contains(oldRoot), "旧部署路径没有移除");
+    Require(updated[updated.Count - 2] == DeploymentLayout.Marker && updated[updated.Count - 1] == newRoot,
+        "新部署路径没有写在受管标记后");
+
+    var dat = Path.Combine(sandbox, "NX", "UGII", "menus", "custom_dirs.dat");
+    DeploymentLayout.WriteCustomDirsAtomic(dat, updated);
+    var written = File.ReadAllLines(dat);
+    Require(written[written.Length - 1] == newRoot, "custom_dirs.dat 原子切换失败");
+    Require(File.ReadAllText(Path.Combine(newApp, "MultiEntityNester.dll")) == "new-dll",
+        "旧 DLL 占用影响了新槽写入");
+
+    if (OperatingSystem.IsWindows())
     {
-        var newRoot = DeploymentLayout.CreateUniqueRoot(tools, "2.1.0.52",
-            new DateTime(2026, 8, 11, 22, 0, 0), "abc12345");
-        Require(!newRoot.Equals(oldRoot, StringComparison.OrdinalIgnoreCase), "新旧部署槽发生碰撞");
-        var newApp = Path.Combine(newRoot, "application");
-        Directory.CreateDirectory(newApp);
-        File.WriteAllText(Path.Combine(newApp, "MultiEntityNester.dll"), "new-dll");
-
-        var existing = new[] {
-            @"C:\OtherNxTool",
-            "# ikun_tools",
-            oldRoot,
-            @"D:\IndependentTool"
-        };
-        var updated = DeploymentLayout.BuildCustomDirs(existing, tools, newRoot);
-        Require(updated.Contains(@"C:\OtherNxTool"), "误删其他 NX 工具路径");
-        Require(updated.Contains(@"D:\IndependentTool"), "误删独立 D 盘工具路径");
-        Require(!updated.Contains(oldRoot), "旧部署路径没有移除");
-        Require(updated[updated.Count - 2] == DeploymentLayout.Marker && updated[updated.Count - 1] == newRoot,
-            "新部署路径没有写在受管标记后");
-
-        var dat = Path.Combine(sandbox, "NX", "UGII", "menus", "custom_dirs.dat");
-        DeploymentLayout.WriteCustomDirsAtomic(dat, updated);
-        var written = File.ReadAllLines(dat);
-        Require(written[written.Length - 1] == newRoot, "custom_dirs.dat 原子切换失败");
-
-        var oldWasLocked = false;
-        try { File.WriteAllText(lockedDll, "overwrite"); }
-        catch (IOException) { oldWasLocked = true; }
-        catch (UnauthorizedAccessException) { oldWasLocked = true; }
-        Require(oldWasLocked, "测试未建立旧 DLL 占用条件");
-        Require(File.ReadAllText(Path.Combine(newApp, "MultiEntityNester.dll")) == "new-dll",
-            "旧 DLL 占用影响了新槽写入");
+        // Windows 专属: 旧 dll 被 NX 以 FileShare.Read 占用时, 写入必须失败 (部署槽机制的前提)
+        using (var nxLock = new FileStream(lockedDll, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            var oldWasLocked = false;
+            try { File.WriteAllText(lockedDll, "overwrite"); }
+            catch (IOException) { oldWasLocked = true; }
+            catch (UnauthorizedAccessException) { oldWasLocked = true; }
+            Require(oldWasLocked, "测试未建立旧 DLL 占用条件");
+        }
+        Console.WriteLine("side-by-side locked-DLL deployment (Windows): PASS");
+    }
+    else
+    {
+        Console.WriteLine("side-by-side deployment (linux: 锁语义跳过): PASS");
     }
 
     Console.WriteLine("side-by-side locked-DLL deployment: PASS");
