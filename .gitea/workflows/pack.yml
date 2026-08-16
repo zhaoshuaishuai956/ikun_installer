@@ -12,6 +12,7 @@ on:
       - UpdateManager.cs
       - UpdateCheckForm.cs
       - plugins.json
+      - CHANGELOG.md
       - ci/**
       - nxplugin/**
       - DeployResources/startup/**

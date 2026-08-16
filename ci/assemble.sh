@@ -63,6 +63,7 @@ mkdir -p "$APP_DIR"
 : > "$CHANGES_FILE"   # 清空子项目变更摘要
 
 total=0
+no_files_repos=()   # G1: 收集不到部署文件的在册插件 (规范 §7.3)
 while IFS='|' read -r repo ref; do
   [ -z "$repo" ] && continue
   ref="${ref:-master}"
@@ -114,7 +115,10 @@ while IFS='|' read -r repo ref; do
     done
   done
   shopt -u nullglob
-  [ "$n" -eq 0 ] && echo "  !! 警告: $repo 未匹配到任何部署文件"
+  if [ "$n" -eq 0 ]; then
+    echo "  !! 警告: $repo 未匹配到任何部署文件"
+    no_files_repos+=("$repo")   # G1 升级: 在册插件收集不到文件 → 打包失败 (规范 §7.3)
+  fi
 
   # ---- 记录相对上次安装包的真实增量，而不是反复显示最新正式版本的第一条 ----
   if [ "$old_sha" = "$current_sha" ]; then
@@ -129,14 +133,42 @@ while IFS='|' read -r repo ref; do
   fi
 
   summaries=()
+  used_fallback=false   # G4 阶段一: 制品更新但 CHANGELOG 无新增条目 → 标红+开 Issue (规范 §6.4)
+  # 判据精化: 仅当部署制品(dll/dlx/dat)真正变化才触发 G4, 文档类提交不误报
+  artifact_changed=false
+  if [ "$old_available" = true ]; then
+    changed_artifacts=$(git -C "$dest" diff --name-only "$old_sha" HEAD -- '*.dll' '*.dlx' '*.dat' 2>/dev/null || true)
+    [ -n "$changed_artifacts" ] && artifact_changed=true
+  else
+    artifact_changed=true   # 首次记录基线: 视为制品更新
+  fi
   if [ "$old_available" = true ]; then
     mapfile -t summaries < <(collect_changelog_delta "$dest" "$old_sha")
-    [ ${#summaries[@]} -eq 0 ] && mapfile -t summaries < <(collect_commit_delta "$dest" "$old_sha")
+    if [ ${#summaries[@]} -eq 0 ]; then
+      used_fallback=true
+      mapfile -t summaries < <(collect_commit_delta "$dest" "$old_sha")
+    fi
     echo "- **${repo}** (\`${old_sha:0:8}\` → \`${current_sha:0:8}\`):" >> "$CHANGES_FILE"
   else
     mapfile -t summaries < <(collect_current_changelog "$dest")
-    [ ${#summaries[@]} -eq 0 ] && mapfile -t summaries < <(collect_commit_delta "$dest" "")
+    if [ ${#summaries[@]} -eq 0 ]; then
+      used_fallback=true
+      mapfile -t summaries < <(collect_commit_delta "$dest" "")
+    fi
     echo "- **${repo}** (首次记录基线 \`${current_sha:0:8}\`):" >> "$CHANGES_FILE"
+  fi
+  if [ "$used_fallback" = true ] && [ "$artifact_changed" = true ]; then
+    # G4 阶段一 (规范 §6.4): 制品已更新但 CHANGELOG 无新条目 → 发布说明标红 + 开 Issue (去重)
+    echo "  - ⚠ **${repo}** 制品已更新但无 CHANGELOG 文字说明（违反规范 §6.2，gate G4 阶段一）" >> "$CHANGES_FILE"
+    # 开 Issue 一律开在安装器仓 (规范 G4: 避免 CI token 需要各插件仓写权限, 与 M11 最小权限一致)
+    issue_title="[G4] ${repo} 制品更新缺 CHANGELOG 条目"
+    if ! curl --fail --silent --show-error --max-time 20 -H "Authorization: token ${PAT}" \
+        "${API}/issues?state=open&limit=50" 2>/dev/null | grep -qF "$issue_title"; then
+      curl --fail --silent --show-error --max-time 20 -X POST -H "Authorization: token ${PAT}" \
+        -H "Content-Type: application/json" \
+        -d "$(jq -n --arg t "$issue_title" --arg b "打包时发现 ${repo} 制品(dll/dlx/dat)已更新但 CHANGELOG.md 无新增条目（规范 §6.4 gate G4 阶段一）。请在变更提交中补充用户可感知的变更说明，否则阶段二将打包失败。" '{title:$t, body:$b}')" \
+        "${API}/issues" >/dev/null 2>&1 && echo "  已开 Issue: $issue_title" || echo "  (开 Issue 失败, 不影响打包)"
+    fi
   fi
   if [ ${#summaries[@]} -eq 0 ]; then
     summaries=("已更新部署文件，子项目未提供文字说明")
@@ -154,4 +186,8 @@ jq -e '.schema == 1 and (.plugins | length > 0)' "$REVISIONS_FILE" >/dev/null ||
 echo "== 收集完成, 共 $total 个文件 =="
 ls -la "$APP_DIR"
 [ "$total" -eq 0 ] && { echo "错误: 未收集到任何资源, 中止"; exit 1; }
+if [ ${#no_files_repos[@]} -gt 0 ]; then
+  echo "错误: 以下在册插件未匹配到任何部署文件 (gate G1): ${no_files_repos[*]}"
+  exit 1
+fi
 exit 0

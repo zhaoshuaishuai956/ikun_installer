@@ -54,7 +54,8 @@ public partial class Form1 : Form
 
     private void InitializeComponent()
     {
-        this.Text = "爱坤工具箱 NX 安装器 v2.1";
+        // 规范 §6.1: UI 版本字符串必须由程序集版本派生, 禁止手写 (迁移项 M3)
+        this.Text = $"爱坤工具箱 NX 安装器 v{UpdateManager.GetLocalVersion()}";
         this.Size = new Size(600, 560);
         this.StartPosition = FormStartPosition.CenterScreen;
         this.FormBorderStyle = FormBorderStyle.FixedDialog;

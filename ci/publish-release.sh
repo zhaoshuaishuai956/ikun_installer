@@ -45,12 +45,23 @@ fi
 REVISION_DATA=$(base64 < "$REVISIONS_FILE" | tr -d '\r\n')
 REVISION_MARKER="<!-- ikun-plugin-revisions:${REVISION_DATA} -->"
 
+# 安装器自身更新内容 (规范 M3 §6.5): 从本仓 CHANGELOG.md 最新段提取 (复用 release-notes.sh)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=release-notes.sh
+source "$SCRIPT_DIR/release-notes.sh"
+INSTALLER_CHANGES=$(collect_current_changelog "$(pwd)" 2>/dev/null || true)
+[ -z "$INSTALLER_CHANGES" ] && INSTALLER_CHANGES="（无安装器变更说明）"
+
 body="$(cat <<EOF
 爱坤工具箱 NX 安装器 v${VERSION}
 
 - 自动构建于 ${BUILD_TIME}
 - 包含 ${PLUGIN_COUNT} 个插件, 从各子项目最新提交打包
 - 下载 ikun_installer.exe 运行即可 (自包含单文件, 无需 .NET)
+
+## 安装器更新内容
+
+${INSTALLER_CHANGES}
 
 ## 子项目更新内容
 
