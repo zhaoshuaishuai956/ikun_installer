@@ -1,0 +1,38 @@
+name: check-sync
+# M14: 源码已更新但制品(dll)未重建的同步检查 (规范 §14 M14 / 绕过路径4)
+# 触发: push 含源码扩展名时, 比对已提交 dll 内嵌构建 SHA 与 HEAD; 不匹配 → 工作流标红
+# 权威模板: ikun_installer/docs/templates/check-sync.yml (规范 M14)
+on:
+  push:
+    branches: [master]
+    paths:
+      - '**.cpp'
+      - '**.hpp'
+      - '**.py'
+jobs:
+  check:
+    runs-on: dotnet
+    steps:
+      - name: 安装 strings 工具
+        run: |
+          set -e
+          if ! command -v strings >/dev/null; then
+            apt-get update -qq && apt-get install -y -qq binutils >/dev/null
+          fi
+      - name: 比对 dll 内嵌构建 SHA 与 HEAD
+        run: |
+          set -e
+          head_short=$(git rev-parse --short HEAD)
+          echo "HEAD = $head_short"
+          dlls=$(git ls-files '*.dll')
+          [ -z "$dlls" ] && { echo "本仓无提交 dll, 跳过"; exit 0; }
+          stale=0
+          for d in $dlls; do
+            git show "HEAD:$d" > /tmp/check-sync.dll 2>/dev/null || continue
+            if ! strings /tmp/check-sync.dll 2>/dev/null | grep -qF "$head_short"; then
+              echo "!! $d 未内嵌构建 SHA $head_short — 源码已更新但制品未重建 (规范 M14)"
+              stale=1
+            fi
+          done
+          [ "$stale" -eq 0 ] && echo "制品与源码同步 OK"
+          exit "$stale"

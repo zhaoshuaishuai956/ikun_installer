@@ -59,6 +59,10 @@ jobs:
         working-directory: repo
         run: bash ci/test-release-notes.sh
 
+      - name: 纯逻辑测试 (M9: 版本契约/部署槽)
+        working-directory: repo
+        run: dotnet run --project tests -c Release
+
       - name: 收集子项目部署资源
         working-directory: repo
         run: bash ci/assemble.sh
