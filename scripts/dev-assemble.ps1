@@ -32,7 +32,8 @@ foreach ($p in $plugins) {
     if (-not $env:GITEA_TOKEN) { throw "需要 \$env:GITEA_TOKEN (克隆私有仓)" }
     $src = Join-Path $env:TEMP "ikun-assemble-$repo"
     if (Test-Path $src) { Remove-Item $src -Recurse -Force }
-    git clone --quiet --depth 1 -c http.sslVerify=false -b $ref "https://zhaoshen:$($env:GITEA_TOKEN)@gt.h.zss.fan:2233/zhaoshen/$repo.git" $src
+    # 规范 §11.6: 不用 sslVerify=false — 本机需已信任自签 CA (更新链同样要求, 见 §9.3.5)
+    git clone --quiet --depth 1 -b $ref "https://zhaoshen:$($env:GITEA_TOKEN)@gt.h.zss.fan:2233/zhaoshen/$repo.git" $src
   }
   if (-not (Test-Path $src)) { Write-Host "跳过 $repo (找不到 $src)" -ForegroundColor Yellow; continue }
 

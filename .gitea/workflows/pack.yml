@@ -21,7 +21,9 @@ jobs:
   pack:
     runs-on: dotnet          # act_runner 上映射为 docker://mcr.microsoft.com/dotnet/sdk:9.0
     env:
-      PAT: ${{ secrets.INSTALLER_DISPATCH_TOKEN }}
+      # M11: 打包 PAT 与通知 dispatch token 分离 (规范 §11.2 双 token 模型)
+      # INSTALLER_RELEASE_TOKEN: 仅存在于安装器仓 (clone 私有仓 + release/tag/资产写)
+      PAT: ${{ secrets.INSTALLER_RELEASE_TOKEN }}
       GITEA_HOST: gt.h.zss.fan:2233
       GITEA_OWNER: zhaoshen
       GITEA_REPO: ikun_installer
@@ -43,6 +45,8 @@ jobs:
           rm -rf repo
           git clone --quiet --depth 1 --branch master \
             "https://${PAT}@${GITEA_HOST}/${GITEA_OWNER}/${GITEA_REPO}.git" repo
+          # G6 secret 扫描需要父提交 (红队批1 P1-3): 补全浅历史
+          git -C repo fetch --quiet --unshallow origin || true
 
       - name: 计算版本号
         working-directory: repo

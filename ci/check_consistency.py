@@ -132,8 +132,9 @@ def main():
         err("G5: application/ 目录不存在")
 
     # G5c: BITMAP == ikun_<repo>.bmp 且文件存在 (updater 例外: ikun_tools.bmp)
+    # 注意: act2btn 键已小写化, 取用必须 repo.lower() (红队批1 P1-2: 大小写 bug)
     for repo in sorted(repo_set):
-        for b in act2btn.get(repo + ".dll", []):
+        for b in act2btn.get(repo.lower() + ".dll", []):
             want = "ikun_%s.bmp" % repo
             if b["bitmap"] != want:
                 err("G5: %s 的 BITMAP=%s, 应为 %s (规范 §4.1/M4 归一)" % (repo, b["bitmap"], want))
@@ -145,13 +146,27 @@ def main():
 
     # G5d: LABEL == plugin.meta.name_cn (字节比较)
     for repo in sorted(repo_set):
-        for b in act2btn.get(repo + ".dll", []):
+        for b in act2btn.get(repo.lower() + ".dll", []):
             m = meta.get(repo)
             if m is None:
                 continue
             want_label = m[0]
             if b["label"] != want_label:
                 err("G5: %s 菜单 LABEL=%s, 应为 meta.name_cn=%s (规范 §8.2/M8b)" % (repo, b["label"], want_label))
+
+    # G5f: LABEL 互不重复 (红队批1 P2-10) + startup/ 无孤儿 bmp
+    seen_labels = {}
+    for b in buttons:
+        if b["label"]:
+            if b["label"] in seen_labels:
+                err("G5f: 菜单 LABEL 重复: %s (%s 与 %s)" % (b["label"], seen_labels[b["label"]], b["id"]))
+            else:
+                seen_labels[b["label"]] = b["id"]
+    referenced_bmps = {b["bitmap"] for b in buttons if b["bitmap"]}
+    if os.path.isdir(STARTUP):
+        for fn in os.listdir(STARTUP):
+            if fn.lower().endswith(".bmp") and fn not in referenced_bmps:
+                warn("G5f: startup/ 存在未被菜单引用的孤儿 bmp: %s" % fn)
 
     # G5e: meta 字段白名单 (规范 §4.2/§11.3)
     for repo, (name_cn, icon_cn, category, in_ikun) in meta.items():

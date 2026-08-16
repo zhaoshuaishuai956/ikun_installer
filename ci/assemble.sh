@@ -160,10 +160,11 @@ while IFS='|' read -r repo ref; do
 
   summaries=()
   used_fallback=false   # G4 阶段一: 制品更新但 CHANGELOG 无新增条目 → 标红+开 Issue (规范 §6.4)
-  # 判据精化: 仅当部署制品(dll/dlx/dat)真正变化才触发 G4, 文档类提交不误报
+  # 判据精化: 仅当部署制品真正变化才触发 G4, 文档类提交不误报;
+  # 制品扩展名从 ikun-deploy.txt globs 派生 (红队批1 P2-8: 含 .def 等定制)
   artifact_changed=false
   if [ "$old_available" = true ]; then
-    changed_artifacts=$(git -C "$dest" diff --name-only "$old_sha" HEAD -- '*.dll' '*.dlx' '*.dat' 2>/dev/null || true)
+    changed_artifacts=$(git -C "$dest" diff --name-only "$old_sha" HEAD -- "${globs[@]}" 2>/dev/null || true)
     [ -n "$changed_artifacts" ] && artifact_changed=true
   else
     artifact_changed=true   # 首次记录基线: 视为制品更新

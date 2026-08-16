@@ -41,13 +41,26 @@ shopt -u nullglob
 
 echo "== G6: 禁止入库物 + secret 扫描 =="
 cd "$ROOT"
-forbidden=$(git ls-files | grep -E '\.(obj|exp|lib|ilk|pdb|pch|sdf|suo|aps|winmd|winmdpdb)$' || true)
+# 规范 §7.4 全清单: 文件类 (*.obj *.exp *.lib *.ilk *.pdb *.pch *.sdf *.suo *.user *.aps *.winmd *.winmdpdb)
+# + 目录/凭证类 (bin/ obj/ publish/ ref/ refint/ .env *.token secrets/) (红队批1 P1-4)
+forbidden=$(git ls-files | grep -E '\.(obj|exp|lib|ilk|pdb|pch|sdf|suo|user|aps|winmd|winmdpdb)$|(^|/)(bin|obj|publish|ref|refint)/|(^|/)\.env$|\.token$|(^|/)secrets/' || true)
 [ -z "$forbidden" ] || { err "G6: 仓库树存在禁止入库物: $forbidden"; }
-# 扫描最近提交的 diff (相对 origin/master) 中的疑似 secret
-base_sha=$(git rev-parse origin/master 2>/dev/null || echo "")
+# 扫描最近一次提交的 diff 中的疑似 secret (pack.yml 已 unshallow, 取父提交)
+base_sha=$(git rev-parse HEAD~1 2>/dev/null || echo "")
 if [ -n "$base_sha" ]; then
   hits=$(git diff "$base_sha"..HEAD -- . 2>/dev/null | grep -aoE '(ghp_[A-Za-z0-9]{20,}|glpat-[A-Za-z0-9_-]{20,}|github_pat_[A-Za-z0-9_]{20,}|Authorization: token [0-9a-f]{20,}|[0-9a-f]{40})' || true)
   [ -z "$hits" ] || { err "G6: 提交 diff 含疑似 secret 字面值"; }
+else
+  warn "G6: 无父提交可对比, secret 扫描跳过 (depth-1 克隆时发生)"
+fi
+
+echo "== G8(阶段一): ikun_updater.dll 与安装器仓 HEAD 绑定检查 =="
+updater="$ROOT/nxplugin/ikun_updater.dll"
+if [ -f "$updater" ]; then
+  head_short=$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || true)
+  if ! strings -a "$updater" 2>/dev/null | grep -qF "$head_short"; then
+    warn "G8(阶段一): nxplugin/ikun_updater.dll 未内嵌构建 SHA ${head_short} (规范 M14; 需开发机重编)"
+  fi
 fi
 
 echo "== G 闸门结果: $([ "$fail" -eq 0 ] && echo PASS || echo FAIL) =="
