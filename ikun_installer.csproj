@@ -23,10 +23,12 @@
     <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
 
-  <!-- 嵌入所有部署资源 + NX 更新插件(由本机 nxplugin/build.ps1 编译) -->
+  <!-- 嵌入所有部署资源 + NX 更新插件(由本机 nxplugin/build.ps1 编译)。
+       application/ 只保留 .gitkeep 占位, 真实资源由 CI assemble 或 dev-assemble.ps1 生成 (规范 M5);
+       .gitkeep 不嵌入 (红队批2 P2-6: 防安装时释放垃圾空文件) -->
   <ItemGroup>
     <EmbeddedResource Include="DeployResources\startup\**\*" />
-    <EmbeddedResource Include="DeployResources\application\**\*" />
+    <EmbeddedResource Include="DeployResources\application\**\*" Exclude="DeployResources\application\.gitkeep" />
     <EmbeddedResource Include="nxplugin\ikun_updater.dll" />
   </ItemGroup>
 

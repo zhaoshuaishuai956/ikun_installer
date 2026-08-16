@@ -28,6 +28,20 @@ public static class AppConfig
     /// <summary>安装目录 (默认 D:\Program Files\ikun tools; 注册表 install_dir / IKUN_INSTALL_DIR 可覆盖)。</summary>
     public static string InstallDir => GetString("install_dir", @"D:\Program Files\ikun tools");
 
+    /// <summary>
+    /// 安装目录合法性 (红队批2 P1-2): 必须是绝对路径、不含路径穿越与引号,
+    /// 防提权流程被同用户进程导向任意目录写入。
+    /// </summary>
+    public static bool IsSafeInstallDir(string dir)
+    {
+        if (string.IsNullOrWhiteSpace(dir)) return false;
+        if (dir.IndexOfAny(new[] { '"', '\'', '\n', '\r' }) >= 0) return false;
+        try { if (!Path.IsPathRooted(dir)) return false; } catch { return false; }
+        var full = Path.GetFullPath(dir);
+        return !full.Contains(".." + Path.DirectorySeparatorChar) &&
+               !full.Contains(".." + Path.AltDirectorySeparatorChar);
+    }
+
     /// <summary>Gitea latest release API (默认自托管地址; 可覆盖)。</summary>
     public static string GiteaLatestApi => GetString("gitea_api",
         "https://gt.h.zss.fan:2233/api/v1/repos/zhaoshen/ikun_installer/releases/tags/latest");

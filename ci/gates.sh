@@ -28,14 +28,13 @@ done
 shopt -u nullglob
 
 echo "== G3: dll 必须导出 ufusr + ufusr_ask_unload =="
-# 判据: PE 导出名表以 ASCII 明文存储, strings 可直接检出 (本地已实证 17 个 dll 全部含双导出)。
-# 不用 objdump -p 解析导出表: 跨 binutils 版本输出格式不稳定 (CI 实测 2.40 误报)。
+# 判据: PE 导出名表以 ASCII+null 明文存储, python 字节级判定。
+# 不用 strings/grep: GNU strings 在容器(arm64 binutils 2.40)输出不稳定 (CI 两次实证误报)。
 shopt -s nullglob
 for f in "$APP"/*.dll; do
-  if ! strings -a "$f" 2>/dev/null | grep -qw 'ufusr'; then
-    err "G3: $f 缺少 ufusr 导出"; continue
+  if ! python3 -c 'import sys; d=open(sys.argv[1],"rb").read(); sys.exit(0 if (b"ufusr\x00" in d and b"ufusr_ask_unload\x00" in d) else 1)' "$f"; then
+    err "G3: $f 缺少 ufusr/ufusr_ask_unload 导出"
   fi
-  strings -a "$f" 2>/dev/null | grep -qw 'ufusr_ask_unload' || { err "G3: $f 缺少 ufusr_ask_unload 导出"; }
 done
 shopt -u nullglob
 
@@ -58,7 +57,7 @@ echo "== G8(阶段一): ikun_updater.dll 与安装器仓 HEAD 绑定检查 =="
 updater="$ROOT/nxplugin/ikun_updater.dll"
 if [ -f "$updater" ]; then
   head_short=$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || true)
-  if ! strings -a "$updater" 2>/dev/null | grep -qF "$head_short"; then
+  if ! python3 -c "import sys; d=open(sys.argv[1],'rb').read(); sys.exit(0 if sys.argv[2].encode() in d else 1)" "$updater" "$head_short"; then
     warn "G8(阶段一): nxplugin/ikun_updater.dll 未内嵌构建 SHA ${head_short} (规范 M14; 需开发机重编)"
   fi
 fi

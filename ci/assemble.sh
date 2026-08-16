@@ -139,7 +139,7 @@ while IFS='|' read -r repo ref; do
       sha_short="${current_sha:0:7}"
       for f in "$APP_DIR"/"$repo"*.dll; do
         [ -f "$f" ] || continue
-        if ! strings "$f" 2>/dev/null | grep -qF "$sha_short"; then
+        if ! python3 -c "import sys; d=open(sys.argv[1],'rb').read(); sys.exit(0 if sys.argv[2].encode() in d else 1)" "$f" "$sha_short"; then
           echo "  !! G8(阶段一): $(basename "$f") 未内嵌构建 SHA $sha_short (规范 M14; 新模板自动内嵌)"
         fi
       done

@@ -28,18 +28,23 @@ public static class Versioning
 
     /// <summary>
     /// 从 release name(外部输入, 不可信)提取 x.y.z(.w)。
-    /// 锚点规则 (规范 §6.6/M9): 前后不得是数字或点, 防止 "1.2.3.4.5" 或 "v9" 误解析; 失败返回 null。
+    /// 锚点规则 (规范 §6.6/M9, 红队批2): 前后不得是数字或点, 拒绝 "1.2.3.4.5"、"v9"、
+    /// 预发布后缀 "-beta"、尾点 "2.1.0."; 允许 "爱坤工具箱 v2.1.0.54" 与 "v2.1.0.54 (修复)"。
+    /// 数字用 TryParse 防溢出 (P2-2)。失败返回 null。
     /// </summary>
     public static Version? ParseRemoteVersion(string name)
     {
         if (string.IsNullOrWhiteSpace(name)) return null;
-        var m = Regex.Match(name, @"(?<![0-9.])(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?(?![\d.])");
+        var m = Regex.Match(name, @"(?<![0-9.])(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?(?=\s*(?:\(|$))");
         if (!m.Success) return null;
-        return new Version(
-            int.Parse(m.Groups[1].Value),
-            int.Parse(m.Groups[2].Value),
-            int.Parse(m.Groups[3].Value),
-            m.Groups[4].Success ? int.Parse(m.Groups[4].Value) : 0);
+        if (!int.TryParse(m.Groups[1].Value, out var major) ||
+            !int.TryParse(m.Groups[2].Value, out var minor) ||
+            !int.TryParse(m.Groups[3].Value, out var build))
+            return null;
+        var rev = 0;
+        if (m.Groups[4].Success && !int.TryParse(m.Groups[4].Value, out rev))
+            return null;
+        return new Version(major, minor, build, rev);
     }
 
     /// <summary>仅当远端严格大于本地才视为有更新 (防降级/重放, 规范 §9.3.2)。</summary>

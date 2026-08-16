@@ -190,11 +190,13 @@ public static class UpdateManager
 
     /// <summary>
     ///  下载后信任校验: ①size 已比对 ②FileVersion 必须等于远端版本(防损坏/错文件)
-    ///  ③有 Authenticode 签名则必须有效 ④Release 正文 sha256 存在则必须匹配 (M10)。
-    ///  信任链权衡(对抗性审查记录): 无签名的企业内部构建放行 + FileVersion 由 Gitea
-    ///  响应提供 → 实际信任边界为「Gitea 服务器 + TLS」; 若 CI token/服务器被攻破即可
-    ///  分发任意代码经 runas 以管理员执行, 属内部构建已知风险; M13(代码签名)落地前
-    ///  保持现状, 落地时切换为 fail-closed。
+    ///  ③sha256 存在则必须匹配 (M10) ④有 Authenticode 签名则必须有效。
+    ///  信任链权衡(对抗性审查记录):
+    ///   - 过渡期 (M13 代码签名落地前): 无签名构建放行 — 信任边界为「Gitea 服务器 + TLS」,
+    ///     sha256 为 TLS 之外的第二道完整性校验 (红队批2 P0-1: 无签名+sha256 匹配必须放行,
+    ///     否则更新链自我中断; 注释曾与实现相反已修复)。
+    ///   - M13 落地时**同一版本原子切换**: 本函数末尾改为 `return sig == true` (签名缺失即拒绝),
+    ///     与首个已签名 exe 一起发布 (规范 §9.3.3/M13)。
     /// </summary>
     public static bool VerifyDownloadedInstaller(string path, Version expected, string? sha256 = null)
     {
@@ -205,14 +207,14 @@ public static class UpdateManager
                 return false;
             var sig = VerifyAuthenticode(path);
             if (sig == null) return false;           // 校验器不可用 → fail-closed
-            if (sig == false && sha256 == null) return true;  // 无签名且无 sha256: 过渡期放行(见上注释)
             if (sha256 != null)
             {
                 var hash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
                 if (!string.Equals(hash, sha256, StringComparison.OrdinalIgnoreCase))
                     return false;
             }
-            return sig != false;                     // 有签名必须有效; 无签名但有 sha256 也放行
+            // 过渡期: 有签名必须有效, 无签名放行 — M13 落地时改为 return sig == true (红队批2 P0-1)
+            return true;
         }
         catch { return false; }
     }
@@ -245,7 +247,13 @@ public static class UpdateManager
             // 强制 size>0 且不超过硬上限, 防御恶意服务器填满磁盘
             var expected = remote.Size > 0 ? remote.Size : resp.Content.Headers.ContentLength ?? 0;
             if (expected <= 0 || expected > MaxDownloadBytes) return null;
-            var temp = Path.Combine(Path.GetTempPath(),
+            // M6/红队批2 P1-3: 下载落用户级受保护目录 (%LOCALAPPDATA%), 禁止 %TEMP% 共享目录
+            // (防同机低权限用户 TOCTOU 换文件; 规范 §9.3.3)
+            var dlDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "ikun_tools", "downloads");
+            Directory.CreateDirectory(dlDir);
+            var temp = Path.Combine(dlDir,
                 $"{Path.GetFileNameWithoutExtension(AssetName)}_{remote.Version}_{Guid.NewGuid():N}.exe");
 
             await using var fs = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None, 64 * 1024, useAsync: true);

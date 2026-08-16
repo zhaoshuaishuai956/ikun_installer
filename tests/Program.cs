@@ -20,6 +20,13 @@ Require(Versioning.ParseRemoteVersion("爱坤工具箱") == null, "无版本名�
 Require(Versioning.ParseRemoteVersion("") == null, "空名必须拒绝");
 Require(Versioning.ParseRemoteVersion(null) == null, "null 必须拒绝");
 Require(Versioning.ParseRemoteVersion("v9") == null, "单段版本必须拒绝");
+Require(Versioning.ParseRemoteVersion("v2.1.0-beta") == null, "预发布后缀必须拒绝 (红队批2 P2-3)");
+Require(Versioning.ParseRemoteVersion("v2.1.0.") == null, "尾点必须拒绝 (红队批2 P2-3)");
+Require(Versioning.ParseRemoteVersion("99999999999999999999.0.0") == null, "溢出必须拒绝 (红队批2 P2-2)");
+Require(Versioning.ParseRemoteVersion("爱坤工具箱 v2.1.0.54 ") == new Version(2, 1, 0, 54),
+    "尾随空格应容忍");
+Require(Versioning.ParseRemoteVersion("爱坤工具箱 v2.1.0.54\t(修复)") == new Version(2, 1, 0, 54),
+    "Tab+括号后缀应容忍");
 
 Require(Versioning.IsNewer(new Version(2, 1, 0, 54), new Version(2, 1, 0, 53)), "新版本应判为新");
 Require(!Versioning.IsNewer(new Version(2, 1, 0, 53), new Version(2, 1, 0, 54)), "旧版本不得判为新 (防降级)");

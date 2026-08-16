@@ -53,6 +53,7 @@ static std::string ReadRegString(const char* valueName)
 }
 
 // 安装器完整路径: 注册表 install_dir > 环境变量 IKUN_INSTALL_DIR > 默认值
+// 红队批2 P2-7: 目录必须过白名单(字母/数字/空格/:\-_.), 防 CreateProcessA 命令行注入
 static std::string GetInstallerExePath()
 {
     std::string dir = ReadRegString(REG_VAL_INSTALL_DIR);
@@ -62,6 +63,14 @@ static std::string GetInstallerExePath()
         if (env != nullptr && *env != '\0') dir = env;
     }
     if (dir.empty()) dir = IKUN_EXE_DEFAULT;
+    bool ok = true;
+    for (char c : dir)
+    {
+        bool valid = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                  || c == ' ' || c == ':' || c == '\\' || c == '/' || c == '-' || c == '_' || c == '.';
+        if (!valid) { ok = false; break; }
+    }
+    if (!ok) dir = IKUN_EXE_DEFAULT;   // 非法配置回退默认值, 不执行
     if (!dir.empty() && dir.back() != '\\' && dir.back() != '/') dir += '\\';
     return dir + "ikun_installer.exe";
 }

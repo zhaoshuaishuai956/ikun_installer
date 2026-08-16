@@ -402,6 +402,14 @@ public partial class Form1 : Form
         }
         UpdateManager.SaveProxy(proxyInput);
 
+        // M6/红队批2 P1-2: 安装目录必须合法 (绝对路径/无穿越/无引号), 防提权写入任意目录
+        if (!AppConfig.IsSafeInstallDir(IkToolDir))
+        {
+            MessageBox.Show($"安装目录不合法: {IkToolDir}\n请通过注册表 install_dir 或环境变量 IKUN_INSTALL_DIR 设置正确的绝对路径。",
+                "安装目录错误", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
         if (!IsElevated())
         {
             Log("安装需要管理员权限，正在请求 UAC 授权...", Color.DarkOrange);
@@ -510,6 +518,14 @@ public partial class Form1 : Form
                 installerCopied ? Color.DarkGray : Color.DarkOrange);
             if (!HardenDirAcl(IkToolDir))
                 Log("  警告: 未能收紧工具箱根目录权限", Color.DarkOrange);
+
+            // M6/红队批2 P1-1: 安装成功即写回 install_dir, NX 侧 ikun_updater.dll 据此定位安装器
+            try
+            {
+                using var regKey = Registry.CurrentUser.CreateSubKey(UserRegistryPath);
+                regKey?.SetValue("install_dir", IkToolDir);
+            }
+            catch { /* 注册表不可写不阻塞安装 */ }
 
             if (nxRunning)
                 Log("  NX 正在运行：旧部署槽保持不动，下次启动自动切换", Color.Blue);

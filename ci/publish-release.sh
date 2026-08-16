@@ -53,7 +53,8 @@ INSTALLER_CHANGES=$(collect_current_changelog "$(pwd)" 2>/dev/null || true)
 [ -z "$INSTALLER_CHANGES" ] && INSTALLER_CHANGES="（无安装器变更说明）"
 
 # M10: 发布物完整性第二道校验 (规范 §9.3.6) — 更新器下载后与正文 sha256 比对
-SHA256=$(sha256sum "$EXE" 2>/dev/null | cut -d' ' -f1 || true)
+# sha256sum 缺失即失败 (红队批2 P2-4: 空哈希会让 M10 静默失效)
+SHA256=$(sha256sum "$EXE" | cut -d' ' -f1)
 
 body="$(cat <<EOF
 爱坤工具箱 NX 安装器 v${VERSION}
