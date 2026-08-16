@@ -2,6 +2,8 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Win32;
 
@@ -12,54 +14,22 @@ namespace ikun_installer;
 ///  设计(第一性原理):
 ///   - 远端版本 = Gitea 滚动 release(latest tag) 的 name 中提取的 x.y.z(.w)
 ///   - 本地版本 = 程序集 FileVersion(CI 以 -p:Version=2.1.0.<run> 注入)
-///   - 代理 = HKCU\Software\ikun_tools\proxy (可空=直连); 默认 192.168.1.5:6666
+///   - 代理 = HKCU\Software\ikun_tools\proxy (可空=直连); 默认见 AppConfig
 ///   - 下载目标文件名固定, 内容来自 Gitea 附件(https + 系统证书校验)
+///   - M9/M10: 强类型 JSON 解析 + 锚点版本正则 + Release 正文 sha256 第二道完整性校验
 /// </summary>
 public static class UpdateManager
 {
     // === 常量 ===
     public const string RegistryKeyPath = @"Software\ikun_tools";
-    public const string DefaultProxy = "192.168.1.5:6666";
-    public const string GiteaLatestApi = "https://gt.h.zss.fan:2233/api/v1/repos/zhaoshen/ikun_installer/releases/tags/latest";
     public const string AssetName = "ikun_installer.exe";
 
     /// <summary>远端 release 信息</summary>
-    public sealed record RemoteRelease(Version Version, string DownloadUrl, long Size);
+    public sealed record RemoteRelease(Version Version, string DownloadUrl, long Size, string? Sha256);
 
     // === 版本 ===
-
-    /// <summary>本地程序集 FileVersion (如 2.1.0.40; 本地构建可能为 2.1.0.0)</summary>
-    public static Version GetLocalVersion()
-    {
-        try
-        {
-            var path = Environment.ProcessPath;
-            if (path != null)
-            {
-                var fv = FileVersionInfo.GetVersionInfo(path).FileVersion;
-                if (!string.IsNullOrEmpty(fv) && Version.TryParse(fv, out var v))
-                    return v;
-            }
-        }
-        catch { }
-        return new Version(0, 0, 0);
-    }
-
-    /// <summary>从 release name(外部输入, 不可信)提取 x.y.z(.w); 失败返回 null</summary>
-    public static Version? ParseRemoteVersion(string name)
-    {
-        if (string.IsNullOrWhiteSpace(name)) return null;
-        var m = Regex.Match(name, @"(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?");
-        if (!m.Success) return null;
-        return new Version(
-            int.Parse(m.Groups[1].Value),
-            int.Parse(m.Groups[2].Value),
-            int.Parse(m.Groups[3].Value),
-            m.Groups[4].Success ? int.Parse(m.Groups[4].Value) : 0);
-    }
-
-    public static bool IsNewer(Version remote, Version local)
-        => remote > local;
+    // 版本解析/比较/哈希提取纯逻辑集中在 Versioning (M9: 可在 CI 容器测试);
+    // 本类只保留与注册表/网络/进程相关的部分。
 
     // === 代理 ===
 
@@ -122,10 +92,32 @@ public static class UpdateManager
         return c;
     }
 
+    // === Gitea 响应强类型 DTO (M9: 替代脆弱正则 JSON 解析) ===
+
+    private sealed class GiteaReleaseDto
+    {
+        public string? Name { get; set; }
+        public string? Body { get; set; }
+        public List<GiteaAssetDto>? Assets { get; set; }
+    }
+
+    private sealed class GiteaAssetDto
+    {
+        public string? Name { get; set; }
+        public long Size { get; set; }
+        public string? BrowserDownloadUrl { get; set; }
+    }
+
+    private static readonly JsonSerializerOptions JsonOpts = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+    };
+
     // === 检查 ===
 
     /// <summary>
-    ///  查询 Gitea latest release 并解析版本/附件地址。
+    ///  查询 Gitea latest release 并解析版本/附件地址/正文 sha256。
     ///  返回 null 表示: 网络失败 / 解析失败 / 无附件(视为"无法检查", 不误报有更新)。
     /// </summary>
     public static async Task<RemoteRelease?> FetchRemoteAsync(string? proxy, CancellationToken ct = default)
@@ -133,27 +125,21 @@ public static class UpdateManager
         try
         {
             using var client = CreateClient(proxy);
-            using var resp = await client.GetAsync(GiteaLatestApi, ct);
+            using var resp = await client.GetAsync(AppConfig.GiteaLatestApi, ct);
             if (!resp.IsSuccessStatusCode) return null;
             var json = await resp.Content.ReadAsStringAsync(ct);
 
-            // 解析: name 与 assets[] 中 name=browser_download_url 配对
-            var nameMatch = Regex.Match(json, @"""name""\s*:\s*""([^""]+)""");
-            if (!nameMatch.Success) return null;
-            var releaseName = nameMatch.Groups[1].Value;
+            var rel = JsonSerializer.Deserialize<GiteaReleaseDto>(json, JsonOpts);
+            if (rel?.Name == null) return null;
+            var asset = rel.Assets?.FirstOrDefault(a =>
+                string.Equals(a.Name, AssetName, StringComparison.OrdinalIgnoreCase));
+            if (asset == null || string.IsNullOrEmpty(asset.BrowserDownloadUrl)) return null;
 
-            // 附件: 只认固定文件名 ikun_installer.exe
-            var assetMatch = Regex.Match(json,
-                @"""name""\s*:\s*""" + Regex.Escape(AssetName) + @"""\s*,\s*""size""\s*:\s*(\d+)[^}]*?""browser_download_url""\s*:\s*""([^""]+)""");
-            if (!assetMatch.Success) return null;
-            var size = long.Parse(assetMatch.Groups[1].Value);
-            var url = assetMatch.Groups[2].Value;
-
-            var ver = ParseRemoteVersion(releaseName);
+            var ver = Versioning.ParseRemoteVersion(rel.Name);
             if (ver == null) return null;
             // 下载地址必须 https, 防 Gitea 响应被控后指向明文 http + MITM (security MEDIUM)
-            if (!url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) return null;
-            return new RemoteRelease(ver, url, size);
+            if (!asset.BrowserDownloadUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) return null;
+            return new RemoteRelease(ver, asset.BrowserDownloadUrl, asset.Size, Versioning.ExtractSha256(rel.Body));
         }
         catch { return null; }
     }
@@ -204,12 +190,13 @@ public static class UpdateManager
 
     /// <summary>
     ///  下载后信任校验: ①size 已比对 ②FileVersion 必须等于远端版本(防损坏/错文件)
-    ///  ③有 Authenticode 签名则必须有效。
+    ///  ③有 Authenticode 签名则必须有效 ④Release 正文 sha256 存在则必须匹配 (M10)。
     ///  信任链权衡(对抗性审查记录): 无签名的企业内部构建放行 + FileVersion 由 Gitea
     ///  响应提供 → 实际信任边界为「Gitea 服务器 + TLS」; 若 CI token/服务器被攻破即可
-    ///  分发任意代码经 runas 以管理员执行, 属内部构建已知风险, 建议后续引入代码签名证书。
+    ///  分发任意代码经 runas 以管理员执行, 属内部构建已知风险; M13(代码签名)落地前
+    ///  保持现状, 落地时切换为 fail-closed。
     /// </summary>
-    public static bool VerifyDownloadedInstaller(string path, Version expected)
+    public static bool VerifyDownloadedInstaller(string path, Version expected, string? sha256 = null)
     {
         try
         {
@@ -217,7 +204,15 @@ public static class UpdateManager
             if (string.IsNullOrEmpty(fv) || !Version.TryParse(fv, out var v) || v != expected)
                 return false;
             var sig = VerifyAuthenticode(path);
-            return sig != null; // 有签名且有效, 或无签名(企业内部构建放行)
+            if (sig == null) return false;           // 校验器不可用 → fail-closed
+            if (sig == false && sha256 == null) return true;  // 无签名且无 sha256: 过渡期放行(见上注释)
+            if (sha256 != null)
+            {
+                var hash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
+                if (!string.Equals(hash, sha256, StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+            return sig != false;                     // 有签名必须有效; 无签名但有 sha256 也放行
         }
         catch { return false; }
     }
@@ -226,10 +221,10 @@ public static class UpdateManager
     ///  注意: 网络失败/解析失败与无更新均返回 null, 调用方需要区分时请用 FetchRemoteAsync + IsNewer。</summary>
     public static async Task<RemoteRelease?> CheckForUpdateAsync(string? proxy, Version? local = null, CancellationToken ct = default)
     {
-        var cur = local ?? GetLocalVersion();
+        var cur = local ?? Versioning.GetLocalVersion();
         var remote = await FetchRemoteAsync(proxy, ct);
         if (remote == null) return null;
-        return IsNewer(remote.Version, cur) ? remote : null;
+        return Versioning.IsNewer(remote.Version, cur) ? remote : null;
     }
 
     // === 下载 ===
@@ -276,8 +271,8 @@ public static class UpdateManager
                 try { File.Delete(temp); } catch { }
                 return null;
             }
-            // 信任链校验: FileVersion 必须等于远端版本; 有 Authenticode 签名则必须有效
-            if (!VerifyDownloadedInstaller(temp, remote.Version))
+            // 信任链校验: FileVersion 必须等于远端版本; 有 Authenticode 签名则必须有效; sha256 存在则必须匹配
+            if (!VerifyDownloadedInstaller(temp, remote.Version, remote.Sha256))
             {
                 try { File.Delete(temp); } catch { }
                 return null;
@@ -292,12 +287,12 @@ public static class UpdateManager
     ///  TOCTOU 防护: runas 确认框显示期间同 TMP 用户可能替换已校验的 exe, 故启动前重校验。
     ///  返回 false 表示校验未通过或启动失败。
     /// </summary>
-    public static bool LaunchInstaller(string exePath, Version expected)
+    public static bool LaunchInstaller(string exePath, Version expected, string? sha256 = null)
     {
         try
         {
-            if (!VerifyDownloadedInstaller(exePath, expected)) return false;
-            // Verb=runas 触发 UAC 提权: 安装器需写 D:\Program Files\ikun tools
+            if (!VerifyDownloadedInstaller(exePath, expected, sha256)) return false;
+            // Verb=runas 触发 UAC 提权: 安装器需写安装目录(见 AppConfig.InstallDir)
             Process.Start(new ProcessStartInfo(exePath) { UseShellExecute = true, Verb = "runas" });
             return true;
         }

@@ -52,12 +52,16 @@ source "$SCRIPT_DIR/release-notes.sh"
 INSTALLER_CHANGES=$(collect_current_changelog "$(pwd)" 2>/dev/null || true)
 [ -z "$INSTALLER_CHANGES" ] && INSTALLER_CHANGES="（无安装器变更说明）"
 
+# M10: 发布物完整性第二道校验 (规范 §9.3.6) — 更新器下载后与正文 sha256 比对
+SHA256=$(sha256sum "$EXE" 2>/dev/null | cut -d' ' -f1 || true)
+
 body="$(cat <<EOF
 爱坤工具箱 NX 安装器 v${VERSION}
 
 - 自动构建于 ${BUILD_TIME}
 - 包含 ${PLUGIN_COUNT} 个插件, 从各子项目最新提交打包
 - 下载 ikun_installer.exe 运行即可 (自包含单文件, 无需 .NET)
+- SHA256: ${SHA256}
 
 ## 安装器更新内容
 

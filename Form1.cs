@@ -28,7 +28,7 @@ public partial class Form1 : Form
 
     // === 部署资源根命名空间 ===
     private const string ResourceRoot = "ikun_installer.DeployResources";
-    private const string IkToolDir = @"D:\Program Files\ikun tools";
+    private static string IkToolDir => AppConfig.InstallDir;   // M6: 注册表/环境变量可覆盖 (规范 §11.4)
     private const string UserRegistryPath = @"Software\ikun_tools";
     private const string PendingNxPathValue = "pending_nx_install_root";
     private readonly string? _proxyArg;
@@ -55,7 +55,7 @@ public partial class Form1 : Form
     private void InitializeComponent()
     {
         // 规范 §6.1: UI 版本字符串必须由程序集版本派生, 禁止手写 (迁移项 M3)
-        this.Text = $"爱坤工具箱 NX 安装器 v{UpdateManager.GetLocalVersion()}";
+        this.Text = $"爱坤工具箱 NX 安装器 v{Versioning.GetLocalVersion()}";
         this.Size = new Size(600, 560);
         this.StartPosition = FormStartPosition.CenterScreen;
         this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -116,7 +116,7 @@ public partial class Form1 : Form
             Font = new Font("Consolas", 9),
             Location = new Point(20, y),
             Size = new Size(460, 24),
-            Text = _proxyArg ?? UpdateManager.ReadProxy() ?? UpdateManager.DefaultProxy
+            Text = _proxyArg ?? UpdateManager.ReadProxy() ?? AppConfig.DefaultProxy
         };
         y += 36;
 
@@ -272,7 +272,7 @@ public partial class Form1 : Form
                 return;
             }
             UpdateManager.SaveProxy(proxyInput);  // 校验通过后保存(供 NX 侧按钮复用)
-            var local = UpdateManager.GetLocalVersion();
+            var local = Versioning.GetLocalVersion();
             Log($"  本地版本: v{local}  代理: {(proxy ?? "(直连)")}", Color.DarkGray);
 
             var remote = await UpdateManager.FetchRemoteAsync(proxy);
@@ -285,7 +285,7 @@ public partial class Form1 : Form
             }
 
             Log($"  远端版本: v{remote.Version}  (大小 {(remote.Size / 1024 / 1024.0):F1} MB)", Color.DarkGray);
-            if (!UpdateManager.IsNewer(remote.Version, local))
+            if (!Versioning.IsNewer(remote.Version, local))
             {
                 Log($"  已是最新版本 v{local}", Color.Green);
                 MessageBox.Show($"已是最新版本: v{local}", "检查更新", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -316,7 +316,7 @@ public partial class Form1 : Form
                 "下载完成", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (ok == DialogResult.Yes)
             {
-                if (!UpdateManager.LaunchInstaller(path, remote.Version))
+                if (!UpdateManager.LaunchInstaller(path, remote.Version, remote.Sha256))
                 {
                     Log("  启动更新安装失败(校验未通过或已被替换), 请重新下载", Color.Red);
                     return;

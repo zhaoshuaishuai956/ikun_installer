@@ -8,6 +8,33 @@ static void Require(bool condition, string message)
     if (!condition) throw new InvalidOperationException(message);
 }
 
+// ============ 版本逻辑测试 (M9: 规范 §6.6 Release name 契约 + §9.3.2 单调) ============
+var ver = Versioning.ParseRemoteVersion("爱坤工具箱 v2.1.0.54");
+Require(ver == new Version(2, 1, 0, 54), "四段版本解析失败");
+Require(Versioning.ParseRemoteVersion("爱坤工具箱 v2.1.0.54 (修复)") == new Version(2, 1, 0, 54),
+    "带后缀的四段解析失败");
+Require(Versioning.ParseRemoteVersion("爱坤工具箱 v2.1.0") == new Version(2, 1, 0, 0), "三段解析失败");
+Require(Versioning.ParseRemoteVersion("爱坤工具箱 v10.0.0") == new Version(10, 0, 0, 0), "两位主版本解析失败");
+Require(Versioning.ParseRemoteVersion("1.2.3.4.5") == null, "五段版本必须拒绝 (M9 锚点)");
+Require(Versioning.ParseRemoteVersion("爱坤工具箱") == null, "无版本名必须拒绝");
+Require(Versioning.ParseRemoteVersion("") == null, "空名必须拒绝");
+Require(Versioning.ParseRemoteVersion(null) == null, "null 必须拒绝");
+Require(Versioning.ParseRemoteVersion("v9") == null, "单段版本必须拒绝");
+
+Require(Versioning.IsNewer(new Version(2, 1, 0, 54), new Version(2, 1, 0, 53)), "新版本应判为新");
+Require(!Versioning.IsNewer(new Version(2, 1, 0, 53), new Version(2, 1, 0, 54)), "旧版本不得判为新 (防降级)");
+Require(!Versioning.IsNewer(new Version(2, 1, 0, 54), new Version(2, 1, 0, 54)), "相等不得判为新 (防重放)");
+
+Require(Versioning.ExtractSha256("...\n- SHA256: " + new string('a', 64) + "\n...")?.Length == 64,
+    "sha256 提取失败");
+Require(Versioning.ExtractSha256("- SHA256: " + new string('A', 64)) == new string('A', 64).ToUpperInvariant(),
+    "sha256 大小写归一失败");
+Require(Versioning.ExtractSha256("无哈希正文") == null, "无哈希应返回 null");
+Require(Versioning.ExtractSha256("- SHA256: abc") == null, "短哈希必须拒绝");
+
+Console.WriteLine("versioning contract tests: PASS");
+
+// ============ 部署槽测试 (既有) ============
 var sandbox = Path.Combine(Path.GetTempPath(), $"ikun-layout-test-{Guid.NewGuid():N}");
 Directory.CreateDirectory(sandbox);
 try

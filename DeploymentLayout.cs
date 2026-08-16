@@ -59,7 +59,9 @@ public static class DeploymentLayout
             var normalized = line.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             if (normalized.Equals(toolsFull, StringComparison.OrdinalIgnoreCase) ||
                 normalized.StartsWith(deployments, StringComparison.OrdinalIgnoreCase) ||
-                normalized.Equals(@"E:\NX二次开发\项目\nx_tools_deploy", StringComparison.OrdinalIgnoreCase))
+                // M6: legacy 检测路径可配置 (规范 §11.4); 默认值兼容旧 custom_dirs.dat
+                normalized.Equals(AppConfig.GetString("legacy_nx_deploy_dir",
+                    @"E:\NX二次开发\项目\nx_tools_deploy"), StringComparison.OrdinalIgnoreCase))
                 continue;
             if (line.Length > 0) result.Add(original);
         }

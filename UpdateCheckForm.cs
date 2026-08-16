@@ -57,8 +57,8 @@ public sealed class UpdateCheckForm : Form
     private async Task RunCheckAsync()
     {
         // 代理: 命令行 --proxy 优先, 否则注册表; 从未设置才用默认(显式清空=直连)
-        var proxy = _proxyArg ?? UpdateManager.ReadProxy() ?? UpdateManager.DefaultProxy;
-        var local = UpdateManager.GetLocalVersion();
+        var proxy = _proxyArg ?? UpdateManager.ReadProxy() ?? AppConfig.DefaultProxy;
+        var local = Versioning.GetLocalVersion();
         UpdateManager.RemoteRelease? remote;
         try
         {
@@ -72,7 +72,7 @@ public sealed class UpdateCheckForm : Form
             _btnClose.Enabled = true;
             return;
         }
-        if (!UpdateManager.IsNewer(remote.Version, local))
+        if (!Versioning.IsNewer(remote.Version, local))
         {
             _lblStatus.Text = $"已是最新版本 (v{local})";
             _btnClose.Enabled = true;
@@ -116,7 +116,7 @@ public sealed class UpdateCheckForm : Form
             MessageBoxIcon.Question);
         if (ok == DialogResult.Yes)
         {
-            if (!UpdateManager.LaunchInstaller(path, r.Version))
+            if (!UpdateManager.LaunchInstaller(path, r.Version, r.Sha256))
             {
                 _lblStatus.Text = "启动更新安装失败(校验未通过或已被替换), 请重新下载";
                 _btnClose.Enabled = true;

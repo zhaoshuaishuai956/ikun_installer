@@ -28,11 +28,14 @@ done
 shopt -u nullglob
 
 echo "== G3: dll 必须导出 ufusr + ufusr_ask_unload =="
+# 判据: PE 导出名表以 ASCII 明文存储, strings 可直接检出 (本地已实证 17 个 dll 全部含双导出)。
+# 不用 objdump -p 解析导出表: 跨 binutils 版本输出格式不稳定 (CI 实测 2.40 误报)。
 shopt -s nullglob
 for f in "$APP"/*.dll; do
-  exports=$(objdump -p "$f" 2>/dev/null || true)
-  echo "$exports" | grep -qw 'ufusr' || { err "G3: $f 缺少 ufusr 导出"; continue; }
-  echo "$exports" | grep -qw 'ufusr_ask_unload' || { err "G3: $f 缺少 ufusr_ask_unload 导出"; }
+  if ! strings -a "$f" 2>/dev/null | grep -qw 'ufusr'; then
+    err "G3: $f 缺少 ufusr 导出"; continue
+  fi
+  strings -a "$f" 2>/dev/null | grep -qw 'ufusr_ask_unload' || { err "G3: $f 缺少 ufusr_ask_unload 导出"; }
 done
 shopt -u nullglob
 

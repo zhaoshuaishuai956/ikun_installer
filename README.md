@@ -17,20 +17,23 @@ NX 插件标准化发布安装器：打包、部署和安装 AiKun Toolbox 集�
 
 ## Run — 如何运行
 
-1. 确保所有子项目已标记 `.ready`
-2. 在 build.ps1 的 `$subIcon` 映射中添加新插件图标文字
-3. 注册菜单和工具栏到 `DeployResources/startup/`
-4. 运行 `build.ps1` 发布
+1. 从本仓库 **Releases → latest** 下载 `ikun_installer.exe` 运行安装（日常唯一通道，见「自动打包」节）
+2. 本地调试安装器：先 `pwsh scripts/dev-assemble.ps1 -ReposRoot <插件克隆根目录>` 重建部署资源，再
+   `dotnet run --project ikun_installer.csproj`（出真包用 CI；旧 `build.ps1`/`update.ps1` 已按规范 M6 移除）
 
 ## Build — 如何编译
 
 ```powershell
-pwsh -ExecutionPolicy Bypass -File .\build.ps1
+# 本地调试编译 (WinForms 需 Windows):
+dotnet build ikun_installer.csproj -c Release
+# 真包由 CI 在 rock5t 交叉编译 (自包含单文件 win-x64), 见 .gitea/workflows/pack.yml
 ```
 
 ## Test — 测试
 
-- 发布说明增量提取：`bash ci/test-release-notes.sh`
+- 发布说明增量提取回归：`bash ci/test-release-notes.sh`
+- 纯逻辑测试（版本契约/部署槽，可在 CI 容器跑）：`dotnet run --project tests`
+- 闸门自检：`bash ci/gates.sh`（G2/G3/G6）+ `python3 ci/check_consistency.py`（G5/G7）
 - 编译后在 NX 1847 中加载安装器
 - 验证插件 DLL/DLX 是否正确部署
 - 检查 NX 菜单和工具栏是否正常显示
@@ -42,26 +45,29 @@ pwsh -ExecutionPolicy Bypass -File .\build.ps1
 | `Form1.cs` | 安装器 UI 窗体 |
 | `Program.cs` | 应用程序入口 |
 | `ikun_installer.csproj` | .NET 9.0 SDK 项目文件 |
-| `build.ps1` | 本机发布脚本（5 步自动化，刷共享盘） |
-| `plugins.json` | 自动打包的子项目清单（仓库+图标） |
-| `ci/assemble.sh` | CI：收集各子项目部署资源 |
+| `AppConfig.cs` / `Versioning.cs` | 运行时可配置项 / 版本纯逻辑（规范 M6/M9） |
+| `plugins.json` | 自动打包的子项目清单（repo+ref；图标取自各仓 plugin.meta） |
+| `scripts/dev-assemble.ps1` | 本地重建 `DeployResources/application`（规范 M5） |
+| `ci/assemble.sh` | CI：收集各子项目部署资源 + meta 摘要 + G1/G4/G8 |
+| `ci/gates.sh` | CI：闸门 G2/G3/G6 |
+| `ci/check_consistency.py` | CI：闸门 G5/G7 一致性校验 |
 | `ci/release-notes.sh` | CI：按上次 Release 基线提取子插件增量更新 |
-| `ci/publish-release.sh` | CI：创建/更新 Gitea Release |
-| `.gitea/workflows/pack.yml` | CI：打包工作流 |
-| `DeployResources/` | 部署资源（菜单/工具栏/图标） |
+| `ci/publish-release.sh` | CI：创建/更新 Gitea Release（含安装器更新段 + sha256） |
+| `.gitea/workflows/pack.yml` | CI：打包工作流（含全部闸门） |
+| `DeployResources/startup/` | 部署资源（菜单/工具栏/图标，GBK 编码） |
 
 ## 自动打包（rock5t CI）
 
 子项目更新后**自动**在 Gitea 主机 rock5t 上打包并更新 Release，无需本机操作。
 
-**触发链**：改插件源码 → push 子项目（dll/dlx/dat 变更）→ 子项目 `notify-installer.yml` 调 API 触发本仓库 `pack.yml` → rock5t 的 act_runner 在 `dotnet/sdk:9.0` 容器里：读 `plugins.json` → clone 各子项目收集资源 → 交叉编译 win-x64 单文件 exe（`EnableWindowsTargeting=true`）→ 更新 Release `latest`（只放 exe）。
+**触发链**：改插件源码 → push 子项目（dll/dlx/dat 变更）→ 子项目 `notify-installer.yml`（权威模板见 `docs/templates/`）调 API 触发本仓库 `pack.yml` → rock5t 的 act_runner 在 `dotnet/sdk:9.0` 容器里：读 `plugins.json` → clone 各子项目收集资源 → 闸门 G1–G8（规范 §7.3）→ 交叉编译 win-x64 单文件 exe（`EnableWindowsTargeting=true`）→ 更新 Release `latest`（只放 exe）。
 
 **取用**：从本仓库 **Releases → latest** 下载 `ikun_installer.exe` 运行安装。
 
-**加新插件**：
-1. `plugins.json` 登记（repo + icon）；
-2. `DeployResources/startup/` 加菜单/图标（GBK 编码，见 `custom.men`/`ikun.rtb`）；
-3. 新插件仓库放 `.gitea/workflows/notify-installer.yml`（复制现有子项目的即可）。
+**加新插件**（规范 §8.2 三步接入，同一提交完成）：
+1. `plugins.json` 登记（repo + ref）；
+2. `DeployResources/startup/` 追加菜单/图标（GBK 编码，LABEL=该仓 `plugin.meta` 的 `name_cn`，见 `custom.men`/`ikun.rtb`）；
+3. 新插件仓库放 `.gitea/workflows/notify-installer.yml`（从权威模板复制，仅允许定制 paths）。
 
 **额外资源**（不止 dll/dlx）：在子项目根放 `ikun-deploy.txt`，每行一个 glob（如 `*.dll`/`*.dlx`/`*.dat`/`*.cfg`）；缺省为 `*.dll *.dlx *.dat`。文件扁平部署到 `application/`。
 

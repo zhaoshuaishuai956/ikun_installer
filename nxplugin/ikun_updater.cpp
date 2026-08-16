@@ -25,9 +25,46 @@
 
 using namespace NXOpen;
 
-static const char* IKUN_EXE = "D:\\Program Files\\ikun tools\\ikun_installer.exe";
+// M6 (规范 §11.4): 安装器路径不再硬编码 — 安装器安装时把目录写入注册表 install_dir,
+// 本 dll 优先读注册表/环境变量 IKUN_INSTALL_DIR, 回退到默认值。
+// 注意: 本文件改动需在开发机用 nxplugin/build.ps1 重编 ikun_updater.dll (NX SDK)。
+static const char* IKUN_EXE_DEFAULT = "D:\\Program Files\\ikun tools\\ikun_installer.exe";
 static const char* REG_KEY  = "Software\\ikun_tools";
-static const char* REG_VAL  = "proxy";
+static const char* REG_VAL_PROXY = "proxy";
+static const char* REG_VAL_INSTALL_DIR = "install_dir";
+
+// 读注册表字符串(空=未设置)
+static std::string ReadRegString(const char* valueName)
+{
+    char buf[1024] = "";
+    HKEY hk = nullptr;
+    if (RegOpenKeyExA(HKEY_CURRENT_USER, REG_KEY, 0, KEY_READ, &hk) == ERROR_SUCCESS)
+    {
+        DWORD type = 0, sz = sizeof(buf);
+        if (RegQueryValueExA(hk, valueName, nullptr, &type, (LPBYTE)buf, &sz) == ERROR_SUCCESS
+            && type == REG_SZ && sz > 0 && buf[0] != '\0')
+        {
+            RegCloseKey(hk);
+            return std::string(buf);
+        }
+        RegCloseKey(hk);
+    }
+    return "";
+}
+
+// 安装器完整路径: 注册表 install_dir > 环境变量 IKUN_INSTALL_DIR > 默认值
+static std::string GetInstallerExePath()
+{
+    std::string dir = ReadRegString(REG_VAL_INSTALL_DIR);
+    if (dir.empty())
+    {
+        const char* env = getenv("IKUN_INSTALL_DIR");
+        if (env != nullptr && *env != '\0') dir = env;
+    }
+    if (dir.empty()) dir = IKUN_EXE_DEFAULT;
+    if (!dir.empty() && dir.back() != '\\' && dir.back() != '/') dir += '\\';
+    return dir + "ikun_installer.exe";
+}
 
 // 显示 NX 消息框: 用 NXMessageBox(按 UTF-8 显示), 不能用 uc1601(UF 层期望 ANSI/GBK,
 // UTF-8 字符串会乱码——踩坑总结「中文编码」)。NX 会话异常时静默。
@@ -48,7 +85,7 @@ static std::string ReadProxyConfig()
     if (RegOpenKeyExA(HKEY_CURRENT_USER, REG_KEY, 0, KEY_READ, &hk) == ERROR_SUCCESS)
     {
         DWORD type = 0, sz = sizeof(buf);
-        if (RegQueryValueExA(hk, REG_VAL, nullptr, &type, (LPBYTE)buf, &sz) == ERROR_SUCCESS
+        if (RegQueryValueExA(hk, REG_VAL_PROXY, nullptr, &type, (LPBYTE)buf, &sz) == ERROR_SUCCESS
             && type == REG_SZ && sz > 0 && buf[0] != '\0')
         {
             for (const char* p = buf; *p; ++p)
@@ -68,7 +105,7 @@ static std::string ReadProxyConfig()
 // 启动安装器检查更新 (CreateProcessA 不经 cmd.exe, 无 shell 注入面)
 static void LaunchUpdateCheck()
 {
-    std::string cmd = std::string("\"") + IKUN_EXE + "\" --check-update";
+    std::string cmd = std::string("\"") + GetInstallerExePath() + "\" --check-update";
     std::string proxy = ReadProxyConfig();
     if (!proxy.empty())
         cmd += " --proxy " + proxy;
@@ -109,7 +146,7 @@ static bool LaunchUpdateCheckOnce()
 static DWORD WINAPI AutoCheckThread(LPVOID)
 {
     Sleep(8000);  // 避开 NX 加载器锁(LoaderLock)与启动高峰; DllMain 内禁止调 NX API
-    if (GetFileAttributesA(IKUN_EXE) != INVALID_FILE_ATTRIBUTES)
+    if (GetFileAttributesA(GetInstallerExePath().c_str()) != INVALID_FILE_ATTRIBUTES)
         LaunchUpdateCheckOnce();
     return 0;
 }
@@ -140,11 +177,11 @@ extern "C" __declspec(dllexport) void ufusr(char* param, int* retcod, int parm_l
     if (err != 0) return;
     try
     {
-        if (GetFileAttributesA(IKUN_EXE) == INVALID_FILE_ATTRIBUTES)
+        if (GetFileAttributesA(GetInstallerExePath().c_str()) == INVALID_FILE_ATTRIBUTES)
         {
             char msg[512] = {};
             snprintf(msg, sizeof(msg),
-                "未找到安装器:\n%s\n\n请先运行爱坤工具箱安装器 (ikun_installer.exe) 完成安装。", IKUN_EXE);
+                "未找到安装器:\n%s\n\n请先运行爱坤工具箱安装器 (ikun_installer.exe) 完成安装。", GetInstallerExePath().c_str());
             ShowNxMsg("爱坤工具箱", msg);
         }
         else if (!LaunchUpdateCheckOnce())
