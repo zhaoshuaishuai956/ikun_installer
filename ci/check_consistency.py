@@ -172,9 +172,8 @@ def main():
     for repo, (name_cn, icon_cn, category, in_ikun) in meta.items():
         if not re.fullmatch(r"[\u4e00-\u9fff]{1,2}|[A-Z]{1,3}", icon_cn or ""):
             err("G5e: %s icon_cn=%r 不合规 (须纯汉字 1-2 字或 1-3 大写字母, 防 ImageMagick 注入)" % (repo, icon_cn))
-        cjk = len(re.findall(r"[\u4e00-\u9fff]", name_cn or ""))
-        if not re.fullmatch(r"[\u4e00-\u9fffA-Za-z0-9]{1,12}", name_cn or "") or cjk > 8:
-            err("G5e: %s name_cn=%r 不合规 (汉字≤8/总长≤12, 无控制字符)" % (repo, name_cn))
+        if not re.fullmatch(r"[\u4e00-\u9fff]{4}", name_cn or ""):
+            err("G5e: %s name_cn=%r 不合规 (须为恰好 4 个汉字)" % (repo, name_cn))
         if category not in ("建模", "CAM", "PMI", "制图", "装配", "钣金", "其它", ""):
             err("G5e: %s category=%r 不在枚举" % (repo, category))
         if in_ikun not in ("true", "false", ""):

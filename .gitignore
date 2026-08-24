@@ -13,6 +13,8 @@
 *.winmdpdb
 ref/
 refint/
+__pycache__/
+*.pyc
 
 # Publish/release output
 bin/
