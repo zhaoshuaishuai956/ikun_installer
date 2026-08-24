@@ -41,6 +41,20 @@ Require(Versioning.ExtractSha256("- SHA256: abc") == null, "短哈希必须拒�
 
 Console.WriteLine("versioning contract tests: PASS");
 
+// ============ 更新检查单实例测试 ============
+var updateMutexName = $"ikun-update-check-test-{Guid.NewGuid():N}";
+using (var firstCheck = UpdateCheckInstanceGuard.TryAcquire(updateMutexName))
+{
+    Require(firstCheck != null, "首个更新检查应获得互斥锁");
+    using var duplicateCheck = UpdateCheckInstanceGuard.TryAcquire(updateMutexName);
+    Require(duplicateCheck == null, "活跃检查期间必须拒绝重复更新对话框");
+}
+using (var nextCheck = UpdateCheckInstanceGuard.TryAcquire(updateMutexName))
+{
+    Require(nextCheck != null, "前一次检查关闭后应允许再次检查");
+}
+Console.WriteLine("update-check single-instance guard: PASS");
+
 // ============ 部署槽测试 (既有) ============
 var sandbox = Path.Combine(Path.GetTempPath(), $"ikun-layout-test-{Guid.NewGuid():N}");
 Directory.CreateDirectory(sandbox);

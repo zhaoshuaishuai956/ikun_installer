@@ -19,6 +19,12 @@ static class Program
         var proxyArg = ExtractProxyArg(args);
         if (args.Contains("--check-update"))
         {
+            // The NX DLL can request a manual check while its delayed startup check is still
+            // pending. Keep this mutex for the entire dialog lifetime so only one process can
+            // display update prompts, including requests from another NX session.
+            using var instanceGuard = UpdateCheckInstanceGuard.TryAcquire();
+            if (instanceGuard == null) return;
+
             Application.Run(new UpdateCheckForm(proxyArg));
             return;
         }

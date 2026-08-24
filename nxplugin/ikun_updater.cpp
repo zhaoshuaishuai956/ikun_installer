@@ -33,6 +33,11 @@ static const char* REG_KEY  = "Software\\ikun_tools";
 static const char* REG_VAL_PROXY = "proxy";
 static const char* REG_VAL_INSTALL_DIR = "install_dir";
 
+// DllMain schedules a delayed startup check whenever NX first loads this DLL. If the first load
+// was caused by clicking the menu action, ufusr already starts a manual check; remember that fact
+// so the delayed thread cannot open the same update prompt again eight seconds later.
+static volatile LONG g_manualCheckRequested = 0;
+
 // 读注册表字符串(空=未设置)
 static std::string ReadRegString(const char* valueName)
 {
@@ -155,7 +160,8 @@ static bool LaunchUpdateCheckOnce()
 static DWORD WINAPI AutoCheckThread(LPVOID)
 {
     Sleep(8000);  // 避开 NX 加载器锁(LoaderLock)与启动高峰; DllMain 内禁止调 NX API
-    if (GetFileAttributesA(GetInstallerExePath().c_str()) != INVALID_FILE_ATTRIBUTES)
+    if (InterlockedCompareExchange(&g_manualCheckRequested, 0, 0) == 0
+        && GetFileAttributesA(GetInstallerExePath().c_str()) != INVALID_FILE_ATTRIBUTES)
         LaunchUpdateCheckOnce();
     return 0;
 }
@@ -182,6 +188,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved)
 
 extern "C" __declspec(dllexport) void ufusr(char* param, int* retcod, int parm_len)
 {
+    InterlockedExchange(&g_manualCheckRequested, 1);
     int err = UF_initialize();
     if (err != 0) return;
     try

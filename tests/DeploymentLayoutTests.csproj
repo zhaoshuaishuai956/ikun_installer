@@ -12,5 +12,6 @@
   <ItemGroup>
     <Compile Include="..\Versioning.cs" Link="src\Versioning.cs" />
     <Compile Include="..\DeploymentLayout.cs" Link="src\DeploymentLayout.cs" />
+    <Compile Include="..\UpdateCheckInstanceGuard.cs" Link="src\UpdateCheckInstanceGuard.cs" />
   </ItemGroup>
 </Project>
