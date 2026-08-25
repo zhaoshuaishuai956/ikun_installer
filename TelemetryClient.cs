@@ -23,13 +23,12 @@ internal static class TelemetryClient
         try
         {
             var enrollment = ReadSetting(EnrollmentValue, "IKUN_TELEMETRY_ENROLLMENT_CODE");
-            if (string.IsNullOrWhiteSpace(enrollment)) return;
             var installId = ReadInstallId();
             var token = ReadProtected(TokenValue);
             var client = CreateClient();
             if (token is null)
             {
-                var response = await PostAsync(client, "/v1/register", new { enrollment_code = enrollment, install_id = installId }, cancellationToken);
+                var response = await PostAsync(client, "/v1/register", new { enrollment_code = enrollment ?? "", install_id = installId }, cancellationToken);
                 if (!response.IsSuccessStatusCode) return;
                 var result = await response.Content.ReadFromJsonAsync<RegisterResponse>(JsonOptions, cancellationToken);
                 if (string.IsNullOrWhiteSpace(result?.DeviceToken)) return;

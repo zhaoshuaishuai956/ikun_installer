@@ -1,6 +1,6 @@
 # 爱坤工具箱遥测服务
 
-遥测服务接收安装器的更新事件和受管设备快照。安装器只有在管理员配置一次性注册码后才启用后台发送；没有注册码时完全不发送，不影响安装、更新或插件运行。
+遥测服务接收安装器的更新事件和受管设备快照。安装器启动时自动尝试后台注册；服务端可启用受限自动登记策略，不需要弹出注册码输入框。
 
 ## 生产入口
 
@@ -8,11 +8,11 @@
 - 内网后端：`http://10.0.0.8:5080`
 - 存活检查：`GET /health/live`
 - 就绪检查：`GET /health/ready`（不应公开给普通用户）
-- 管理后台：`https://td.h.zss.fan:2233/dashboard`（HTTP Basic Auth）
+- 管理后台：`https://td.h.zss.fan:2233/dashboard`（独立只读服务端口，无登录密码）
 
 Lucky 代理仅转发 `/v1/register`、`/v1/events` 和 `/v1/device-snapshot`，并设置 `X-Forwarded-Proto`、`X-Forwarded-For` 和目标 Host。
 
-管理后台使用独立域名和独立 Basic Auth 凭据，只能读取聚合统计与最近事件；浏览器不接触 PostgreSQL 连接串、运行账号或加密密钥。
+管理后台使用独立容器和独立服务端口，只能读取聚合统计与最近事件；浏览器不接触 PostgreSQL 连接串、运行账号或加密密钥。
 
 ## 客户端配置
 
@@ -21,7 +21,7 @@ Lucky 代理仅转发 `/v1/register`、`/v1/events` 和 `/v1/device-snapshot`，
 - `telemetry_enrollment_code`：管理员通过 CLI 生成的一次性注册码；使用后服务端立即作废。
 - `telemetry_url`：可选，默认 `https://tm.h.zss.fan:2233`。
 
-也可使用环境变量 `IKUN_TELEMETRY_ENROLLMENT_CODE`、`IKUN_TELEMETRY_URL`。设备 token 由 Windows DPAPI CurrentUser 加密后保存，服务端只保存 SHA-256，不保存明文 token。
+也可使用环境变量 `IKUN_TELEMETRY_ENROLLMENT_CODE`、`IKUN_TELEMETRY_URL`。关闭 `IKUN_TELEMETRY_AUTO_ENROLL` 后，客户端必须提供注册码。设备 token 由 Windows DPAPI CurrentUser 加密后保存，服务端只保存 SHA-256，不保存明文 token。
 
 ## 管理 CLI
 

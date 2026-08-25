@@ -24,33 +24,6 @@ builder.Services.AddSingleton<TelemetryStore>();
 builder.Services.AddSingleton<DashboardStore>();
 builder.Services.AddHealthChecks();
 var app = builder.Build();
-app.Use(async (ctx, next) =>
-{
-    if (ctx.Request.Path.StartsWithSegments("/dashboard"))
-    {
-        var expectedUser = Environment.GetEnvironmentVariable("IKUN_TELEMETRY_DASHBOARD_USER");
-        var expectedPassword = Environment.GetEnvironmentVariable("IKUN_TELEMETRY_DASHBOARD_PASSWORD");
-        var auth = ctx.Request.Headers.Authorization.ToString();
-        var valid = false;
-        if (!string.IsNullOrWhiteSpace(expectedUser) && !string.IsNullOrWhiteSpace(expectedPassword) && auth.StartsWith("Basic ", StringComparison.Ordinal))
-        {
-            try
-            {
-                var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(auth[6..]));
-                var split = decoded.IndexOf(':');
-                valid = split > 0 && Security.FixedEquals(decoded[..split], expectedUser) && Security.FixedEquals(decoded[(split + 1)..], expectedPassword);
-            }
-            catch { valid = false; }
-        }
-        if (!valid)
-        {
-            ctx.Response.StatusCode = 401;
-            ctx.Response.Headers.WWWAuthenticate = "Basic realm=ikun-dashboard";
-            return;
-        }
-    }
-    await next();
-});
 app.UseExceptionHandler(error => error.Run(async c =>
 {
     c.Response.StatusCode = 503;
@@ -72,16 +45,20 @@ app.Use(async (ctx, next) =>
 });
 app.MapHealthChecks("/health/live");
 app.MapGet("/health/ready", (TelemetryStore db) => db.Ready ? Results.Ok(new { status = "ready" }) : Results.StatusCode(503));
-app.MapGet("/dashboard", (IWebHostEnvironment env) => Results.File(Path.Combine(env.WebRootPath ?? "wwwroot", "index.html"), "text/html; charset=utf-8"));
-app.MapGet("/dashboard/api/summary", async (DashboardStore db, HttpContext ctx) => Results.Ok(await db.SummaryAsync(RequestCancellation(ctx))));
-app.MapGet("/dashboard/api/events", async (DashboardStore db, HttpContext ctx) => Results.Ok(await db.RecentEventsAsync(RequestCancellation(ctx))));
+if (!string.Equals(Environment.GetEnvironmentVariable("IKUN_TELEMETRY_DASHBOARD_ENABLED"), "false", StringComparison.OrdinalIgnoreCase))
+{
+    app.MapGet("/dashboard", (IWebHostEnvironment env) => Results.File(Path.Combine(env.WebRootPath ?? "wwwroot", "index.html"), "text/html; charset=utf-8"));
+    app.MapGet("/dashboard/api/summary", async (DashboardStore db, HttpContext ctx) => Results.Ok(await db.SummaryAsync(RequestCancellation(ctx))));
+    app.MapGet("/dashboard/api/events", async (DashboardStore db, HttpContext ctx) => Results.Ok(await db.RecentEventsAsync(RequestCancellation(ctx))));
+}
 
 app.MapPost("/v1/register", async (HttpContext ctx, RegisterRequest request, RateLimitState limits, TelemetryStore db) =>
 {
     if (limits.IsBlocked(ctx) || !limits.AllowGlobal() || !limits.AllowIp(ctx, "register", 3, TimeSpan.FromMinutes(1))) return Results.Unauthorized();
-    if (!Guid.TryParse(request.InstallId, out var installId) || request.EnrollmentCode is null || request.EnrollmentCode.Length is < 32 or > 256) return Results.BadRequest(new { error = "invalid_request" });
+    var autoEnroll = string.Equals(Environment.GetEnvironmentVariable("IKUN_TELEMETRY_AUTO_ENROLL"), "true", StringComparison.OrdinalIgnoreCase);
+    if (!Guid.TryParse(request.InstallId, out var installId) || (!autoEnroll && (request.EnrollmentCode is null || request.EnrollmentCode.Length is < 32 or > 256))) return Results.BadRequest(new { error = "invalid_request" });
     var ct = RequestCancellation(ctx);
-    if (!await db.ConsumeEnrollmentAsync(request.EnrollmentCode, ct)) return Results.BadRequest(new { error = "invalid_request" });
+    if (!autoEnroll && !await db.ConsumeEnrollmentAsync(request.EnrollmentCode!, ct)) return Results.BadRequest(new { error = "invalid_request" });
     var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
     if (!await db.CreateDeviceAsync(installId, Security.Hash(token), ct)) return Results.BadRequest(new { error = "invalid_request" });
     return Results.Ok(new { install_id = installId, device_token = token });
