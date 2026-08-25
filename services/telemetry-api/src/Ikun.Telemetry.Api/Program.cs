@@ -21,8 +21,36 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 });
 builder.Services.AddSingleton<RateLimitState>();
 builder.Services.AddSingleton<TelemetryStore>();
+builder.Services.AddSingleton<DashboardStore>();
 builder.Services.AddHealthChecks();
 var app = builder.Build();
+app.Use(async (ctx, next) =>
+{
+    if (ctx.Request.Path.StartsWithSegments("/dashboard"))
+    {
+        var expectedUser = Environment.GetEnvironmentVariable("IKUN_TELEMETRY_DASHBOARD_USER");
+        var expectedPassword = Environment.GetEnvironmentVariable("IKUN_TELEMETRY_DASHBOARD_PASSWORD");
+        var auth = ctx.Request.Headers.Authorization.ToString();
+        var valid = false;
+        if (!string.IsNullOrWhiteSpace(expectedUser) && !string.IsNullOrWhiteSpace(expectedPassword) && auth.StartsWith("Basic ", StringComparison.Ordinal))
+        {
+            try
+            {
+                var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(auth[6..]));
+                var split = decoded.IndexOf(':');
+                valid = split > 0 && Security.FixedEquals(decoded[..split], expectedUser) && Security.FixedEquals(decoded[(split + 1)..], expectedPassword);
+            }
+            catch { valid = false; }
+        }
+        if (!valid)
+        {
+            ctx.Response.StatusCode = 401;
+            ctx.Response.Headers.WWWAuthenticate = "Basic realm=ikun-dashboard";
+            return;
+        }
+    }
+    await next();
+});
 app.UseExceptionHandler(error => error.Run(async c =>
 {
     c.Response.StatusCode = 503;
@@ -44,6 +72,9 @@ app.Use(async (ctx, next) =>
 });
 app.MapHealthChecks("/health/live");
 app.MapGet("/health/ready", (TelemetryStore db) => db.Ready ? Results.Ok(new { status = "ready" }) : Results.StatusCode(503));
+app.MapGet("/dashboard", (IWebHostEnvironment env) => Results.File(Path.Combine(env.WebRootPath ?? "wwwroot", "index.html"), "text/html; charset=utf-8"));
+app.MapGet("/dashboard/api/summary", async (DashboardStore db, HttpContext ctx) => Results.Ok(await db.SummaryAsync(RequestCancellation(ctx))));
+app.MapGet("/dashboard/api/events", async (DashboardStore db, HttpContext ctx) => Results.Ok(await db.RecentEventsAsync(RequestCancellation(ctx))));
 
 app.MapPost("/v1/register", async (HttpContext ctx, RegisterRequest request, RateLimitState limits, TelemetryStore db) =>
 {
@@ -163,5 +194,32 @@ public sealed class TelemetryStore
     }
     (byte[] Cipher, byte[] Nonce) Encrypt(string value) { var nonce = RandomNumberGenerator.GetBytes(12); var plain = Encoding.UTF8.GetBytes(value); var cipher = new byte[plain.Length]; var tag = new byte[16]; using var aes = new AesGcm(encryptionKey, 16); aes.Encrypt(nonce, plain, cipher, tag, Encoding.UTF8.GetBytes("ikun-telemetry-v1")); return (cipher.Concat(tag).ToArray(), nonce); }
     string Hmac(string value) => Convert.ToHexString(new HMACSHA256(hmacKey).ComputeHash(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
+}
+
+public sealed class DashboardStore
+{
+    private readonly string? connectionString;
+    public DashboardStore(IConfiguration config) => connectionString = Environment.GetEnvironmentVariable("IKUN_TELEMETRY_DB") ?? config["IKUN_TELEMETRY_DB"];
+    private async Task<NpgsqlConnection> Open(CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString)) throw new InvalidOperationException("not configured");
+        var csb = new NpgsqlConnectionStringBuilder(connectionString) { MaxPoolSize = 4, Timeout = 3, CommandTimeout = 3 };
+        var c = new NpgsqlConnection(csb.ConnectionString); await c.OpenAsync(ct); return c;
+    }
+    public async Task<object> SummaryAsync(CancellationToken ct)
+    {
+        await using var c = await Open(ct);
+        async Task<long> Count(string sql) { await using var q = new NpgsqlCommand(sql, c); return (long)(await q.ExecuteScalarAsync(ct) ?? 0L); }
+        return new { devices = await Count("SELECT count(*) FROM telemetry.devices"), active_devices = await Count("SELECT count(*) FROM telemetry.devices WHERE disabled_at IS NULL"), events_24h = await Count("SELECT count(*) FROM telemetry.events WHERE received_at >= now() - interval '24 hours'"), snapshots_24h = await Count("SELECT count(*) FROM telemetry.device_snapshots WHERE received_at >= now() - interval '24 hours'") };
+    }
+    public async Task<IReadOnlyList<object>> RecentEventsAsync(CancellationToken ct)
+    {
+        var result = new List<object>();
+        await using var c = await Open(ct);
+        await using var q = new NpgsqlCommand("SELECT event_type, trigger_source, result, installer_version, remote_version, received_at FROM telemetry.events ORDER BY received_at DESC LIMIT 30", c);
+        await using var rows = await q.ExecuteReaderAsync(ct);
+        while (await rows.ReadAsync(ct)) result.Add(new { event_type = rows.GetString(0), trigger_source = rows.GetString(1), result = rows.GetString(2), installer_version = rows.GetString(3), remote_version = rows.IsDBNull(4) ? null : rows.GetString(4), received_at = rows.GetDateTime(5) });
+        return result;
+    }
 }
 public partial class Program { }

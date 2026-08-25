@@ -8,8 +8,11 @@
 - 内网后端：`http://10.0.0.8:5080`
 - 存活检查：`GET /health/live`
 - 就绪检查：`GET /health/ready`（不应公开给普通用户）
+- 管理后台：`https://td.h.zss.fan:2233/dashboard`（HTTP Basic Auth）
 
 Lucky 代理仅转发 `/v1/register`、`/v1/events` 和 `/v1/device-snapshot`，并设置 `X-Forwarded-Proto`、`X-Forwarded-For` 和目标 Host。
+
+管理后台使用独立域名和独立 Basic Auth 凭据，只能读取聚合统计与最近事件；浏览器不接触 PostgreSQL 连接串、运行账号或加密密钥。
 
 ## 客户端配置
 
