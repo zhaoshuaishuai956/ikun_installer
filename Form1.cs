@@ -23,6 +23,8 @@ public partial class Form1 : Form
     private Button btnCheckUpdate = null!;
     private Label lblProxy = null!;
     private TextBox txtProxy = null!;
+    private Label lblTelemetryCode = null!;
+    private TextBox txtTelemetryCode = null!;
     private ProgressBar progressBar = null!;
     private RichTextBox txtLog = null!;
 
@@ -46,6 +48,9 @@ public partial class Form1 : Form
                 var pending = key?.GetValue(PendingNxPathValue) as string;
                 if (!string.IsNullOrWhiteSpace(pending)) txtNxPath.Text = pending;
                 key?.DeleteValue(PendingNxPathValue, throwOnMissingValue: false);
+                var pendingCode = key?.GetValue("pending_telemetry_enrollment_code") as string;
+                if (pendingCode is not null) txtTelemetryCode.Text = pendingCode;
+                key?.DeleteValue("pending_telemetry_enrollment_code", throwOnMissingValue: false);
             }
             catch { }
             Shown += (_, _) => BeginInvoke(new Action(() => BtnInstall_Click(null, EventArgs.Empty)));
@@ -56,7 +61,7 @@ public partial class Form1 : Form
     {
         // 规范 §6.1: UI 版本字符串必须由程序集版本派生, 禁止手写 (迁移项 M3)
         this.Text = $"爱坤工具箱 NX 安装器 v{Versioning.GetLocalVersion()}";
-        this.Size = new Size(600, 560);
+        this.Size = new Size(600, 630);
         this.StartPosition = FormStartPosition.CenterScreen;
         this.FormBorderStyle = FormBorderStyle.FixedDialog;
         this.MaximizeBox = false;
@@ -120,6 +125,25 @@ public partial class Form1 : Form
         };
         y += 36;
 
+        // 受管部署注册码：不提供隐私勾选框；空值表示不启用遥测。
+        lblTelemetryCode = new Label
+        {
+            Text = "受管部署注册码(可空):",
+            Font = new Font("Microsoft YaHei", 9),
+            AutoSize = true,
+            Location = new Point(20, y)
+        };
+        y += 24;
+        txtTelemetryCode = new TextBox
+        {
+            Font = new Font("Consolas", 9),
+            Location = new Point(20, y),
+            Size = new Size(550, 24),
+            UseSystemPasswordChar = true,
+            Text = ReadTelemetryEnrollmentCode()
+        };
+        y += 36;
+
         // 安装按钮 + 检查更新按钮
         btnInstall = new Button
         {
@@ -175,6 +199,8 @@ public partial class Form1 : Form
         this.Controls.Add(btnBrowse);
         this.Controls.Add(lblProxy);
         this.Controls.Add(txtProxy);
+        this.Controls.Add(lblTelemetryCode);
+        this.Controls.Add(txtTelemetryCode);
         this.Controls.Add(btnInstall);
         this.Controls.Add(btnCheckUpdate);
         this.Controls.Add(progressBar);
@@ -354,7 +380,10 @@ public partial class Form1 : Form
             var self = current.MainModule?.FileName;
             if (string.IsNullOrWhiteSpace(self) || !File.Exists(self)) return false;
             using (var key = Registry.CurrentUser.CreateSubKey(UserRegistryPath))
+            {
                 key?.SetValue(PendingNxPathValue, txtNxPath.Text.Trim(), RegistryValueKind.String);
+                key?.SetValue("pending_telemetry_enrollment_code", txtTelemetryCode.Text.Trim(), RegistryValueKind.String);
+            }
             Process.Start(new ProcessStartInfo(self, "--install")
             {
                 UseShellExecute = true,
@@ -403,6 +432,7 @@ public partial class Form1 : Form
             return;
         }
         UpdateManager.SaveProxy(proxyInput);
+        SaveTelemetryEnrollmentCode(txtTelemetryCode.Text.Trim());
 
         // M6/红队批2 P1-2: 安装目录必须合法 (绝对路径/无穿越/无引号), 防提权写入任意目录
         if (!AppConfig.IsSafeInstallDir(IkToolDir))
@@ -545,6 +575,8 @@ public partial class Form1 : Form
             }
             catch { /* 注册表不可写不阻塞安装 */ }
 
+            _ = TelemetryClient.InitializeAsync();
+
             if (!createdNewRoot)
                 Log("  已有插件已原位热更新，下次点击 bar 按钮即使用新版", Color.Blue);
             if (newPlugins.Count > 0)
@@ -683,5 +715,24 @@ public partial class Form1 : Form
         txtLog.SelectionColor = color;
         txtLog.AppendText(msg + "\n");
         txtLog.ScrollToCaret();
+    }
+
+    private static string ReadTelemetryEnrollmentCode()
+    {
+        try { return Registry.CurrentUser.OpenSubKey(UserRegistryPath)?.GetValue("telemetry_enrollment_code") as string ?? ""; }
+        catch { return ""; }
+    }
+
+    private static void SaveTelemetryEnrollmentCode(string code)
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(UserRegistryPath);
+            if (string.IsNullOrWhiteSpace(code))
+                key?.DeleteValue("telemetry_enrollment_code", throwOnMissingValue: false);
+            else
+                key?.SetValue("telemetry_enrollment_code", code, RegistryValueKind.String);
+        }
+        catch { }
     }
 }
