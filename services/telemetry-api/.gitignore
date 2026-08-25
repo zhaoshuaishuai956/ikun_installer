@@ -1,0 +1,14 @@
+**/bin/
+**/obj/
+*.user
+*.suo
+.env
+.env.*
+!.env.example
+secrets/
+*.pfx
+*.pem
+*.key
+*.crt
+*.log
+appsettings.Production.json

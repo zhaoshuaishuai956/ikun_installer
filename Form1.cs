@@ -276,6 +276,7 @@ public partial class Form1 : Form
             Log($"  本地版本: v{local}  代理: {(proxy ?? "(直连)")}", Color.DarkGray);
 
             var remote = await UpdateManager.FetchRemoteAsync(proxy);
+            TelemetryClient.QueueEvent("update_check", "manual", remote is null ? "failed" : Versioning.IsNewer(remote.Version, local) ? "update_available" : "up_to_date", remote?.Version);
             if (remote == null)
             {
                 Log("  检查失败: 无法连接 Gitea 或解析版本信息", Color.Red);
@@ -295,13 +296,14 @@ public partial class Form1 : Form
             var ask = MessageBox.Show(
                 $"发现新版本 v{remote.Version} (当前 v{local})\n\n是否立即下载更新?",
                 "发现新版本", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
-            if (ask != DialogResult.Yes) return;
+            if (ask != DialogResult.Yes) { TelemetryClient.QueueEvent("update_offer_closed", "manual", "closed", remote.Version); return; }
 
             // 下载 (进度条复用安装进度条)
             Log($"  开始下载 {remote.DownloadUrl}", Color.DarkGray);
             progressBar.Value = 0;
             var progress = new Progress<double>(p => progressBar.Value = Math.Min(100, (int)(p * 100)));
             var path = await UpdateManager.DownloadAsync(remote, proxy, progress);
+            TelemetryClient.QueueEvent(path is null ? "download_failed" : "download_completed", "manual", path is null ? "failed" : "completed", remote.Version);
             if (path == null)
             {
                 Log("  下载失败: 请检查代理与网络", Color.Red);

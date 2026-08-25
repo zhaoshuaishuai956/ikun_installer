@@ -11,6 +11,7 @@ static class Program
     static void Main(string[] args)
     {
         ApplicationConfiguration.Initialize();
+        _ = TelemetryClient.InitializeAsync();
 
         // M6: 运行时可配置项注入 (规范 §11.4; 注册表>环境变量>默认值)
         DeploymentLayout.LegacyDeployDir = AppConfig.GetString(

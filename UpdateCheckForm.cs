@@ -68,12 +68,14 @@ public sealed class UpdateCheckForm : Form
 
         if (remote == null)
         {
+            TelemetryClient.QueueEvent("update_check", "first_plugin_use", "failed");
             _lblStatus.Text = "检查失败: 无法连接 Gitea 或解析版本信息";
             _btnClose.Enabled = true;
             return;
         }
         if (!Versioning.IsNewer(remote.Version, local))
         {
+            TelemetryClient.QueueEvent("update_check", "first_plugin_use", "up_to_date", remote.Version);
             _lblStatus.Text = $"已是最新版本 (v{local})";
             _btnClose.Enabled = true;
             _autoClose = new System.Windows.Forms.Timer { Interval = 3000 };
@@ -92,7 +94,7 @@ public sealed class UpdateCheckForm : Form
             "发现新版本",
             MessageBoxButtons.YesNo,
             MessageBoxIcon.Information);
-        if (ask != DialogResult.Yes) { Close(); return; }
+        if (ask != DialogResult.Yes) { TelemetryClient.QueueEvent("update_offer_closed", "first_plugin_use", "closed", r.Version); Close(); return; }
 
         _lblStatus.Text = $"正在下载 {verText} ...";
         var progress = new Progress<double>(p =>
@@ -101,6 +103,7 @@ public sealed class UpdateCheckForm : Form
             _lblStatus.Text = $"正在下载 {verText} ... {_progress.Value}%";
         });
         var path = await UpdateManager.DownloadAsync(r, proxy, progress);
+        TelemetryClient.QueueEvent(path is null ? "download_failed" : "download_completed", "first_plugin_use", path is null ? "failed" : "completed", r.Version);
         if (path == null)
         {
             _lblStatus.Text = "下载失败, 请检查代理与网络";

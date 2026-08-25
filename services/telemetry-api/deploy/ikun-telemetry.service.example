@@ -1,0 +1,48 @@
+[Unit]
+Description=Ikun anonymous telemetry API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=ikun-telemetry
+Group=ikun-telemetry
+WorkingDirectory=/opt/ikun-telemetry
+ExecStart=/opt/ikun-telemetry/Ikun.Telemetry.Api
+EnvironmentFile=/etc/ikun-telemetry/telemetry.env
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/ikun-telemetry
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+MemoryMax=256M
+TasksMax=128
+
+[Install]
+WantedBy=multi-user.target
+
+# telemetry.env must be root:ikun-telemetry 0640 and contain only:
+# IKUN_TELEMETRY_DB=postgresql://runtime_user:REDACTED@127.0.0.1:5432/telemetry
+# Never put a real password in this example or in a unit ExecStart line.
+# Build/publish with .NET 9, then place the output at /opt/ikun-telemetry.
+# Do not expose 5080 publicly; configure Lucky Web reverse proxy separately.
+
+# Rollback: systemctl disable --now ikun-telemetry; restore prior binary/config.
+
+# This is a template only; not installed or enabled by this task.
+
+# Production requirements: migration first using migration identity, then start
+# with runtime identity; configure firewall and exact Lucky KnownProxies.
+
+# Swagger/metrics/admin/ready must not be exposed by the public Lucky rule.
+
+# The API itself binds localhost:5080 in Program.cs.
+
+# Retention runs externally as a controlled DB maintenance task.
+
+# Review service account and filesystem ownership before use.
+
+# End template.
