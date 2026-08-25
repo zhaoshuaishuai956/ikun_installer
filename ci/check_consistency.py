@@ -86,8 +86,14 @@ def check_plugin_bmp(path, repo):
             err("G5c: %s 的图标不是 BMP: %s" % (repo, os.path.basename(path)))
             return
         dib_size, width, height, planes, bits = struct.unpack_from("<IiiHH", header, 14)
-        if dib_size < 40 or width != 24 or abs(height) != 24 or planes != 1 or bits != 24:
-            err("G5c: %s 的图标须为 24x24、24 位 BMP，实为 %sx%s、%s 位: %s" %
+        if dib_size < 40 or planes != 1 or bits != 24:
+            err("G5c: %s 的图标须为 24 位 BMP，实为 %sx%s、%s 位: %s" %
+                (repo, width, height, bits, os.path.basename(path)))
+        elif width == 24 and abs(height) == 24:
+            warn("G5c: %s 仍为旧版 24x24 图标，重绘时必须升级为 32x32: %s" %
+                 (repo, os.path.basename(path)))
+        elif width != 32 or abs(height) != 32:
+            err("G5c: %s 的图标须为 32x32（或迁移期旧版 24x24）、24 位 BMP，实为 %sx%s、%s 位: %s" %
                 (repo, width, height, bits, os.path.basename(path)))
     except OSError as ex:
         err("G5c: 无法读取 %s 图标: %s" % (repo, ex))
