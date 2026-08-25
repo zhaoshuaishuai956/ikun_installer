@@ -50,6 +50,12 @@ if (!string.Equals(Environment.GetEnvironmentVariable("IKUN_TELEMETRY_DASHBOARD_
     app.MapGet("/dashboard", (IWebHostEnvironment env) => Results.File(Path.Combine(env.WebRootPath ?? "wwwroot", "index.html"), "text/html; charset=utf-8"));
     app.MapGet("/dashboard/api/summary", async (DashboardStore db, HttpContext ctx) => Results.Ok(await db.SummaryAsync(RequestCancellation(ctx))));
     app.MapGet("/dashboard/api/events", async (DashboardStore db, HttpContext ctx) => Results.Ok(await db.RecentEventsAsync(RequestCancellation(ctx))));
+    if (string.Equals(Environment.GetEnvironmentVariable("IKUN_TELEMETRY_DASHBOARD_ROOT"), "true", StringComparison.OrdinalIgnoreCase))
+    {
+        app.MapGet("/", (IWebHostEnvironment env) => Results.File(Path.Combine(env.WebRootPath ?? "wwwroot", "index.html"), "text/html; charset=utf-8"));
+        app.MapGet("/api/summary", async (DashboardStore db, HttpContext ctx) => Results.Ok(await db.SummaryAsync(RequestCancellation(ctx))));
+        app.MapGet("/api/events", async (DashboardStore db, HttpContext ctx) => Results.Ok(await db.RecentEventsAsync(RequestCancellation(ctx))));
+    }
 }
 
 app.MapPost("/v1/register", async (HttpContext ctx, RegisterRequest request, RateLimitState limits, TelemetryStore db) =>

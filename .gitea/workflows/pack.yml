@@ -8,6 +8,7 @@ on:
     paths:
       - ikun_installer.csproj
       - Form1.cs
+      - TelemetryClient.cs
       - Program.cs
       - AppConfig.cs
       - Versioning.cs
