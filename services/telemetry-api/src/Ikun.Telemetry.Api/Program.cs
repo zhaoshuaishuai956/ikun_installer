@@ -55,6 +55,7 @@ if (!string.Equals(Environment.GetEnvironmentVariable("IKUN_TELEMETRY_DASHBOARD_
         app.MapGet("/", (IWebHostEnvironment env) => Results.File(Path.Combine(env.WebRootPath ?? "wwwroot", "index.html"), "text/html; charset=utf-8"));
         app.MapGet("/api/summary", async (DashboardStore db, HttpContext ctx) => Results.Ok(await db.SummaryAsync(RequestCancellation(ctx))));
         app.MapGet("/api/events", async (DashboardStore db, HttpContext ctx) => Results.Ok(await db.RecentEventsAsync(RequestCancellation(ctx))));
+        app.MapGet("/api/devices", async (DashboardStore db, HttpContext ctx) => Results.Ok(await db.DevicesAsync(RequestCancellation(ctx))));
     }
 }
 
@@ -66,7 +67,7 @@ app.MapPost("/v1/register", async (HttpContext ctx, RegisterRequest request, Rat
     var ct = RequestCancellation(ctx);
     if (!autoEnroll && !await db.ConsumeEnrollmentAsync(request.EnrollmentCode!, ct)) return Results.BadRequest(new { error = "invalid_request" });
     var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
-    if (!await db.CreateDeviceAsync(installId, Security.Hash(token), ct)) return Results.BadRequest(new { error = "invalid_request" });
+    if (!await db.CreateDeviceAsync(installId, Security.Hash(token), ClientIp(ctx), ct)) return Results.BadRequest(new { error = "invalid_request" });
     return Results.Ok(new { install_id = installId, device_token = token });
 });
 
@@ -77,7 +78,7 @@ app.MapPost("/v1/events", async (HttpContext ctx, EventRequest request, RateLimi
     if (token is null || !Guid.TryParse(request.InstallId, out var installId)) return Results.Unauthorized();
     var tokenHash = Security.Hash(token);
     var ct = RequestCancellation(ctx);
-    if (!await db.TokenBelongsAsync(installId, tokenHash, ct)) { limits.InvalidToken(ctx); return Results.Unauthorized(); }
+    if (!await db.TokenBelongsAsync(installId, tokenHash, ClientIp(ctx), ct)) { limits.InvalidToken(ctx); return Results.Unauthorized(); }
     if (!limits.AllowIp(ctx, "events", 30, TimeSpan.FromMinutes(1)) || !limits.AllowToken(tokenHash, 10, TimeSpan.FromMinutes(1)) || !limits.AllowDaily(tokenHash, 200)) return TooManyResult.Instance;
     if (!Validation.ValidEvent(request)) return Results.BadRequest(new { error = "invalid_request" });
     await db.InsertEventAsync(request, ct);
@@ -91,7 +92,7 @@ app.MapPost("/v1/device-snapshot", async (HttpContext ctx, SnapshotRequest reque
     if (token is null || !Guid.TryParse(request.InstallId, out var installId)) return Results.Unauthorized();
     var tokenHash = Security.Hash(token);
     var ct = RequestCancellation(ctx);
-    if (!await db.TokenBelongsAsync(installId, tokenHash, ct)) { limits.InvalidToken(ctx); return Results.Unauthorized(); }
+    if (!await db.TokenBelongsAsync(installId, tokenHash, ClientIp(ctx), ct)) { limits.InvalidToken(ctx); return Results.Unauthorized(); }
     if (!limits.AllowIp(ctx, "snapshot", 10, TimeSpan.FromMinutes(1)) || !limits.AllowToken(tokenHash, 10, TimeSpan.FromMinutes(1))) return TooManyResult.Instance;
     if (!Validation.ValidSnapshot(request)) return Results.BadRequest(new { error = "invalid_request" });
     await db.InsertSnapshotAsync(request, ct);
@@ -100,6 +101,7 @@ app.MapPost("/v1/device-snapshot", async (HttpContext ctx, SnapshotRequest reque
 app.Run();
 
 static CancellationToken RequestCancellation(HttpContext c) => c.Items["request_token"] is CancellationToken t ? t : c.RequestAborted;
+static string ClientIp(HttpContext c) => c.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 static string? Bearer(HttpContext c) { var value = c.Request.Headers.Authorization.ToString(); return value.StartsWith("Bearer ", StringComparison.Ordinal) ? value[7..].Trim() : null; }
 public sealed record RegisterRequest([property: JsonPropertyName("enrollment_code")] string? EnrollmentCode, [property: JsonPropertyName("install_id")] string InstallId);
 public sealed record EventRequest([property: JsonPropertyName("event_id")] string EventId, [property: JsonPropertyName("install_id")] string InstallId, [property: JsonPropertyName("event_type")] string EventType, [property: JsonPropertyName("trigger_source")] string TriggerSource, [property: JsonPropertyName("installer_version")] string InstallerVersion, [property: JsonPropertyName("remote_version")] string? RemoteVersion, [property: JsonPropertyName("nx_version")] string? NxVersion, [property: JsonPropertyName("os_version")] string OsVersion, [property: JsonPropertyName("result")] string Result, [property: JsonPropertyName("occurred_at")] DateTimeOffset OccurredAt);
@@ -160,8 +162,8 @@ public sealed class TelemetryStore
     byte[] DecodeKey(string name) { var value = Environment.GetEnvironmentVariable(name) ?? ""; try { return Convert.FromBase64String(value); } catch { return []; } }
     async Task<NpgsqlConnection> Open(CancellationToken ct) { if (!Ready) throw new InvalidOperationException("not configured"); var csb = new NpgsqlConnectionStringBuilder(connectionString) { MaxPoolSize = 20, Timeout = 3, CommandTimeout = 3 }; var c = new NpgsqlConnection(csb.ConnectionString); await c.OpenAsync(ct); return c; }
     public async Task<bool> ConsumeEnrollmentAsync(string code, CancellationToken ct) { await using var c = await Open(ct); await using var q = new NpgsqlCommand("UPDATE telemetry.enrollment_tokens SET used_at=now() WHERE code_hash=$1 AND used_at IS NULL AND expires_at>now() RETURNING id", c); q.Parameters.AddWithValue(Security.Hash(code)); return await q.ExecuteScalarAsync(ct) is not null; }
-    public async Task<bool> CreateDeviceAsync(Guid id, string hash, CancellationToken ct) { await using var c = await Open(ct); await using var q = new NpgsqlCommand("INSERT INTO telemetry.devices(install_id,token_hash) VALUES($1,$2) ON CONFLICT(install_id) DO NOTHING", c); q.Parameters.AddWithValue(id); q.Parameters.AddWithValue(hash); return await q.ExecuteNonQueryAsync(ct) == 1; }
-    public async Task<bool> TokenBelongsAsync(Guid id, string hash, CancellationToken ct) { await using var c = await Open(ct); await using var q = new NpgsqlCommand("SELECT token_hash FROM telemetry.devices WHERE install_id=$1 AND disabled_at IS NULL", c); q.Parameters.AddWithValue(id); var value = (await q.ExecuteScalarAsync(ct))?.ToString(); return value is not null && Security.FixedEquals(value, hash); }
+    public async Task<bool> CreateDeviceAsync(Guid id, string hash, string ip, CancellationToken ct) { await using var c = await Open(ct); await using var q = new NpgsqlCommand("INSERT INTO telemetry.devices(install_id,token_hash,last_ip,last_seen_at) VALUES($1,$2,$3::inet,now()) ON CONFLICT(install_id) DO NOTHING", c); q.Parameters.AddWithValue(id); q.Parameters.AddWithValue(hash); q.Parameters.AddWithValue(ip); return await q.ExecuteNonQueryAsync(ct) == 1; }
+    public async Task<bool> TokenBelongsAsync(Guid id, string hash, string ip, CancellationToken ct) { await using var c = await Open(ct); await using var q = new NpgsqlCommand("UPDATE telemetry.devices SET last_ip=$3::inet,last_seen_at=now() WHERE install_id=$1 AND token_hash=$2 AND disabled_at IS NULL RETURNING token_hash", c); q.Parameters.AddWithValue(id); q.Parameters.AddWithValue(hash); q.Parameters.AddWithValue(ip); return await q.ExecuteScalarAsync(ct) is not null; }
     public async Task InsertEventAsync(EventRequest x, CancellationToken ct) { await using var c = await Open(ct); await using var q = new NpgsqlCommand("INSERT INTO telemetry.events(event_id,install_id,event_type,trigger_source,installer_version,remote_version,nx_version,os_version,result,occurred_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(event_id) DO NOTHING", c); q.Parameters.AddWithValue(Guid.Parse(x.EventId)); q.Parameters.AddWithValue(Guid.Parse(x.InstallId)); q.Parameters.AddWithValue(x.EventType); q.Parameters.AddWithValue(x.TriggerSource); q.Parameters.AddWithValue(x.InstallerVersion); q.Parameters.AddWithValue((object?)x.RemoteVersion ?? DBNull.Value); q.Parameters.AddWithValue((object?)x.NxVersion ?? DBNull.Value); q.Parameters.AddWithValue(x.OsVersion); q.Parameters.AddWithValue(x.Result); q.Parameters.AddWithValue(x.OccurredAt); await q.ExecuteNonQueryAsync(ct); }
     public async Task InsertSnapshotAsync(SnapshotRequest x, CancellationToken ct)
     {
@@ -202,6 +204,15 @@ public sealed class DashboardStore
         await using var q = new NpgsqlCommand("SELECT event_type, trigger_source, result, installer_version, remote_version, received_at FROM telemetry.events ORDER BY received_at DESC LIMIT 30", c);
         await using var rows = await q.ExecuteReaderAsync(ct);
         while (await rows.ReadAsync(ct)) result.Add(new { event_type = rows.GetString(0), trigger_source = rows.GetString(1), result = rows.GetString(2), installer_version = rows.GetString(3), remote_version = rows.IsDBNull(4) ? null : rows.GetString(4), received_at = rows.GetDateTime(5) });
+        return result;
+    }
+    public async Task<IReadOnlyList<object>> DevicesAsync(CancellationToken ct)
+    {
+        var result = new List<object>();
+        await using var c = await Open(ct);
+        await using var q = new NpgsqlCommand("SELECT install_id, last_ip::text, last_seen_at, created_at, disabled_at FROM telemetry.devices ORDER BY COALESCE(last_seen_at, created_at) DESC", c);
+        await using var rows = await q.ExecuteReaderAsync(ct);
+        while (await rows.ReadAsync(ct)) result.Add(new { install_id = rows.GetGuid(0), ip = rows.IsDBNull(1) ? null : rows.GetString(1), last_seen_at = rows.IsDBNull(2) ? (DateTime?)null : rows.GetDateTime(2), created_at = rows.GetDateTime(3), status = rows.IsDBNull(4) ? "active" : "disabled" });
         return result;
     }
 }

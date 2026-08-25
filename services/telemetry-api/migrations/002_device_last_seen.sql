@@ -1,0 +1,4 @@
+BEGIN;
+ALTER TABLE telemetry.devices ADD COLUMN IF NOT EXISTS last_ip INET;
+ALTER TABLE telemetry.devices ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ;
+COMMIT;
