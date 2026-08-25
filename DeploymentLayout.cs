@@ -8,8 +8,8 @@ using System.Text;
 namespace ikun_installer;
 
 /// <summary>
-/// 管理 NX 插件的不可变部署槽。运行中的 NX 可以继续持有旧槽里的 DLL，安装器只写
-/// 新槽并切换 custom_dirs.dat；新槽会在下一次 NX 启动时生效。
+/// 管理 NX 插件部署目录。已注册的活动目录优先原位更新，使立即卸载的既有插件
+/// 可在当前 NX 会话内热更新；只有首次安装才创建新部署槽并修改 custom_dirs.dat。
 /// </summary>
 public static class DeploymentLayout
 {
@@ -33,6 +33,55 @@ public static class DeploymentLayout
         if (safeNonce.Length < 4) safeNonce = generatedNonce;
         var stamp = (now ?? DateTime.Now).ToString("yyyyMMdd-HHmmss");
         return Path.Combine(Path.GetFullPath(toolsDir), "deployments", $"{safeVersion}-{stamp}-{safeNonce}");
+    }
+
+    /// <summary>从 custom_dirs.dat 找到当前注册的爱坤工具箱目录；无可用目录时返回 null。</summary>
+    public static string? FindActiveRoot(IEnumerable<string> existingLines, string toolsDir)
+    {
+        var toolsFull = Normalize(toolsDir);
+        var deployments = Path.Combine(toolsFull, "deployments") + Path.DirectorySeparatorChar;
+        var legacyFull = Normalize(LegacyDeployDir);
+        var lines = existingLines.Select(line => line.Trim()).ToList();
+
+        for (var i = 0; i < lines.Count; i++)
+        {
+            if (!lines[i].Equals(Marker, StringComparison.OrdinalIgnoreCase) &&
+                !lines[i].Equals(LegacyMarker, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var j = i + 1;
+            while (j < lines.Count && string.IsNullOrWhiteSpace(lines[j])) j++;
+            if (j < lines.Count && IsManagedRoot(lines[j], toolsFull, deployments, legacyFull))
+                return Normalize(lines[j]);
+        }
+
+        // 兼容早期没有 marker、直接写入 tools 根目录或部署槽的配置。
+        for (var i = lines.Count - 1; i >= 0; i--)
+        {
+            if (IsManagedRoot(lines[i], toolsFull, deployments, legacyFull))
+                return Normalize(lines[i]);
+        }
+        return null;
+    }
+
+    /// <summary>在同目录写临时文件后原子替换，失败时保留原文件。</summary>
+    public static void WriteFileAtomic(string targetPath, byte[] content)
+    {
+        var fullTarget = Path.GetFullPath(targetPath);
+        var directory = Path.GetDirectoryName(fullTarget)
+            ?? throw new ArgumentException("目标文件路径无效。", nameof(targetPath));
+        Directory.CreateDirectory(directory);
+        var temp = Path.Combine(directory, $".{Path.GetFileName(fullTarget)}.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            File.WriteAllBytes(temp, content);
+            if (File.Exists(fullTarget)) File.Replace(temp, fullTarget, null);
+            else File.Move(temp, fullTarget);
+        }
+        finally
+        {
+            try { if (File.Exists(temp)) File.Delete(temp); } catch { }
+        }
     }
 
     public static List<string> BuildCustomDirs(IEnumerable<string> existingLines,
@@ -106,6 +155,19 @@ public static class DeploymentLayout
             finally { foreach (var process in processes) process.Dispose(); }
         }
         return false;
+    }
+
+    private static string Normalize(string path) => Path.GetFullPath(path)
+        .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+    private static bool IsManagedRoot(string candidate, string toolsFull,
+        string deployments, string legacyFull)
+    {
+        if (string.IsNullOrWhiteSpace(candidate) || !Path.IsPathRooted(candidate)) return false;
+        var normalized = Normalize(candidate);
+        return normalized.Equals(toolsFull, StringComparison.OrdinalIgnoreCase) ||
+               normalized.StartsWith(deployments, StringComparison.OrdinalIgnoreCase) ||
+               normalized.Equals(legacyFull, StringComparison.OrdinalIgnoreCase);
     }
 
 }

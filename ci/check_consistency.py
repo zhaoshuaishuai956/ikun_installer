@@ -131,6 +131,15 @@ def main():
     else:
         err("G5: application/ 目录不存在")
 
+    # G5b2: 每个业务插件都必须嵌入“本 NX 会话首次使用时检查更新”标记。
+    reminder_marker = "ikun_first_plugin_check_".encode("utf-16le")
+    for repo in sorted(repo_set):
+        dll = os.path.join(APP, repo + ".dll")
+        if os.path.exists(dll):
+            with open(dll, "rb") as f:
+                if reminder_marker not in f.read():
+                    err("G5: %s.dll 未嵌入首次使用更新检查" % repo)
+
     # G5c: BITMAP == ikun_<repo>.bmp 且文件存在 (updater 例外: ikun_tools.bmp)
     # 注意: act2btn 键已小写化, 取用必须 repo.lower() (红队批1 P1-2: 大小写 bug)
     for repo in sorted(repo_set):

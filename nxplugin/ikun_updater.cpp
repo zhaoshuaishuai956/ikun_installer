@@ -2,7 +2,6 @@
  *  ikun_updater.cpp - 爱坤工具箱「检查更新」NX 插件 (NX 1847)
  *  入口:
  *   - ufusr: 菜单/Ribbon「检查更新」按钮 (ACTIONS ikun_updater.dll)
- *   - DllMain: NX 加载本 dll 时延迟线程自动检测 (每次启动 NX 自动检查)
  *  功能: 读注册表 HKCU\Software\ikun_tools\proxy (代理配置, 由安装器维护),
  *        启动 ikun_installer.exe --check-update [--proxy ...]
  *        版本对比/下载/更新安装对话框全部由安装器完成。
@@ -32,11 +31,6 @@ static const char* IKUN_EXE_DEFAULT = "D:\\Program Files\\ikun tools\\ikun_insta
 static const char* REG_KEY  = "Software\\ikun_tools";
 static const char* REG_VAL_PROXY = "proxy";
 static const char* REG_VAL_INSTALL_DIR = "install_dir";
-
-// DllMain schedules a delayed startup check whenever NX first loads this DLL. If the first load
-// was caused by clicking the menu action, ufusr already starts a manual check; remember that fact
-// so the delayed thread cannot open the same update prompt again eight seconds later.
-static volatile LONG g_manualCheckRequested = 0;
 
 // 读注册表字符串(空=未设置)
 static std::string ReadRegString(const char* valueName)
@@ -154,41 +148,8 @@ static bool LaunchUpdateCheckOnce()
     return acquired;
 }
 
-// 自动检测线程: 保活引用由 DllMain 持有并常驻至 NX 进程退出
-// (线程内不可 FreeLibrary 保活引用——unmap 后线程继续执行 DLL 代码是 use-after-unload 崩溃;
-//  保活引用常驻, 进程退出时由加载器自动清理, 为自保活插件标准做法)
-static DWORD WINAPI AutoCheckThread(LPVOID)
-{
-    Sleep(8000);  // 避开 NX 加载器锁(LoaderLock)与启动高峰; DllMain 内禁止调 NX API
-    if (InterlockedCompareExchange(&g_manualCheckRequested, 0, 0) == 0
-        && GetFileAttributesA(GetInstallerExePath().c_str()) != INVALID_FILE_ATTRIBUTES)
-        LaunchUpdateCheckOnce();
-    return 0;
-}
-
-BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved)
-{
-    if (reason == DLL_PROCESS_ATTACH)
-    {
-        // 保活在 CreateThread 前完成: 若 NX 在 8s 窗口内 FreeLibrary, 线程恢复执行即访问
-        // 已卸载代码 → 崩溃。LoadLibraryA 对同路径已加载模块走加载器快速路径, 只 +1 引用计数。
-        char selfPath[MAX_PATH] = {};
-        HMODULE self = nullptr;
-        if (GetModuleFileNameA(hModule, selfPath, MAX_PATH) > 0)
-            self = LoadLibraryA(selfPath);
-        if (!self) return TRUE;  // 保活失败 → fail-closed: 不创建线程
-
-        HANDLE h = CreateThread(nullptr, 0, AutoCheckThread, nullptr, 0, nullptr);
-        if (h) CloseHandle(h);
-        else FreeLibrary(self);  // 线程未创建, 且此刻无其他线程在执行 DLL 代码, 释放保活引用安全
-        // 线程创建成功: 保活引用常驻不释放, 进程退出由加载器清理
-    }
-    return TRUE;
-}
-
 extern "C" __declspec(dllexport) void ufusr(char* param, int* retcod, int parm_len)
 {
-    InterlockedExchange(&g_manualCheckRequested, 1);
     int err = UF_initialize();
     if (err != 0) return;
     try

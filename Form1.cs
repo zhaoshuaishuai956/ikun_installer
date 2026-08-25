@@ -424,6 +424,7 @@ public partial class Form1 : Form
         progressBar.Value = 0;
         int totalSteps = 5;
         string? deploymentRoot = null;
+        bool createdNewRoot = false;
         bool registered = false;
 
         try
@@ -433,8 +434,17 @@ public partial class Form1 : Form
             var nxMenus = Path.Combine(nxUgii, "menus");
             var datFile = Path.Combine(nxMenus, "custom_dirs.dat");
             var nxRunning = DeploymentLayout.IsNxRunning();
-            deploymentRoot = DeploymentLayout.CreateUniqueRoot(
-                IkToolDir, Application.ProductVersion);
+            var customDirLines = File.Exists(datFile)
+                ? File.ReadAllLines(datFile, Encoding.UTF8)
+                : Array.Empty<string>();
+            var activeRoot = DeploymentLayout.FindActiveRoot(customDirLines, IkToolDir);
+            if (!string.IsNullOrEmpty(activeRoot) && Directory.Exists(activeRoot))
+                deploymentRoot = activeRoot;
+            else
+            {
+                deploymentRoot = DeploymentLayout.CreateUniqueRoot(IkToolDir, Application.ProductVersion);
+                createdNewRoot = true;
+            }
             var startupDir = Path.Combine(deploymentRoot, "startup");
             var appDir = Path.Combine(deploymentRoot, "application");
 
@@ -447,12 +457,14 @@ public partial class Form1 : Form
             Log($"  NX 路径验证通过: {nxUgii}", Color.Green);
             progressBar.Value = (int)(1.0 / totalSteps * 100);
 
-            // 步骤2: 每次创建全新部署槽。绝不覆盖运行中 NX 已加载的 DLL。
-            Log("\n[2/5] 创建独立部署槽...", Color.Black);
+            // 步骤2: 既有目录原位热更新；首次安装才创建部署槽。
+            Log("\n[2/5] 准备插件部署目录...", Color.Black);
             Directory.CreateDirectory(startupDir);
             Directory.CreateDirectory(appDir);
-            Log($"  NX 状态: {(nxRunning ? "正在运行，保留当前插件" : "未运行")}",
-                nxRunning ? Color.DarkOrange : Color.Green);
+            Log(createdNewRoot ? "  首次安装：创建新部署槽" : "  已找到活动目录：将原位热更新",
+                createdNewRoot ? Color.DarkOrange : Color.Green);
+            Log($"  NX 状态: {(nxRunning ? "正在运行" : "未运行")}",
+                nxRunning ? Color.Blue : Color.Green);
             Log($"  {deploymentRoot}", Color.Green);
             Log($"  {startupDir}", Color.Green);
             Log($"  {appDir}", Color.Green);
@@ -460,7 +472,7 @@ public partial class Form1 : Form
 
             // 步骤3: 释放部署文件
             Log("\n[3/5] 释放部署文件...", Color.Black);
-            await Task.Run(() => ExtractResources(startupDir, appDir));
+            var newPlugins = await Task.Run(() => ExtractResources(startupDir, appDir));
             progressBar.Value = (int)(3.0 / totalSteps * 100);
 
             // 步骤4: 激活前先验证完整性，再收紧 ACL。不能先把目录改成只读后再写文件。
@@ -502,11 +514,15 @@ public partial class Form1 : Form
                 Log("  警告: 未能收紧部署槽权限，文件已完整释放", Color.DarkOrange);
             progressBar.Value = (int)(4.0 / totalSteps * 100);
 
-            // 步骤5: 同目录临时文件 + 原子替换。运行中的 NX 已读取旧配置，不受影响；
-            // 新启动的 NX 才读取新部署槽。
-            Log("\n[5/5] 原子切换 NX 注册路径...", Color.Black);
-            Directory.CreateDirectory(nxMenus);
-            await Task.Run(() => RegisterCustomDirs(datFile, deploymentRoot));
+            // 步骤5: 热更新不改 custom_dirs.dat；首次安装才注册新槽。
+            Log("\n[5/5] 确认 NX 注册路径...", Color.Black);
+            if (createdNewRoot)
+            {
+                Directory.CreateDirectory(nxMenus);
+                await Task.Run(() => RegisterCustomDirs(datFile, deploymentRoot));
+            }
+            else
+                Log("  保持当前注册路径，bar 上已有功能可直接加载新文件", Color.Green);
             registered = true;
 
             // 安装器固定放在根目录，供旧槽和新槽中的更新按钮共同调用。
@@ -527,30 +543,33 @@ public partial class Form1 : Form
             }
             catch { /* 注册表不可写不阻塞安装 */ }
 
-            if (nxRunning)
-                Log("  NX 正在运行：旧部署槽保持不动，下次启动自动切换", Color.Blue);
-            else
-                Log("  旧部署槽已保留，可用于安全回退；不会覆盖或删除已加载 DLL", Color.DarkGray);
+            if (!createdNewRoot)
+                Log("  已有插件已原位热更新，下次点击 bar 按钮即使用新版", Color.Blue);
+            if (newPlugins.Count > 0)
+                Log($"  检测到 {newPlugins.Count} 个新增插件，需重启 NX 后载入菜单", Color.DarkOrange);
             progressBar.Value = 100;
 
             Log("\n========================================", Color.Green);
             Log("  爱坤工具箱 安装成功!", Color.Green);
             Log("========================================", Color.Green);
-            Log(nxRunning
-                ? "NX 无需现在关闭；新版本将在下次启动 NX 时生效。"
-                : "启动 NX 1847 后，在 Help 右侧使用爱坤工具箱。", Color.Blue);
+            var resultMessage = createdNewRoot
+                ? (nxRunning
+                    ? "首次安装已完成。请重启 NX 以载入爱坤工具箱。"
+                    : "首次安装已完成。启动 NX 后即可使用爱坤工具箱。")
+                : newPlugins.Count > 0
+                    ? $"已有插件已热更新，可直接使用。\n检测到 {newPlugins.Count} 个新增插件，需重启 NX 后出现。"
+                    : "已有插件已热更新，bar 上功能可直接使用，无需重启 NX。";
+            Log(resultMessage.Replace("\n", " "), Color.Blue);
 
             MessageBox.Show(
-                nxRunning
-                    ? "安装成功！\n\n当前 NX 可以继续使用，不需要关闭。\n新插件将在下次启动 NX 时自动生效。"
-                    : "安装成功！\n\n启动 NX 1847 后，在菜单栏 Help 右侧\n点击「爱坤工具箱」即可使用。",
+                $"安装成功！\n\n{resultMessage}",
                 "安装完成",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
         }
         catch (Exception ex)
         {
-            if (!registered && !string.IsNullOrEmpty(deploymentRoot))
+            if (!registered && createdNewRoot && !string.IsNullOrEmpty(deploymentRoot))
             {
                 try { if (Directory.Exists(deploymentRoot)) Directory.Delete(deploymentRoot, recursive: true); }
                 catch { }
@@ -568,7 +587,7 @@ public partial class Form1 : Form
         }
     }
 
-    private void ExtractResources(string startupDir, string appDir)
+    private List<string> ExtractResources(string startupDir, string appDir)
     {
         var asm = System.Reflection.Assembly.GetExecutingAssembly();
         var resourceNames = asm.GetManifestResourceNames();
@@ -579,6 +598,7 @@ public partial class Form1 : Form
             Log($"    {rn}", Color.DarkGray);
 
         int extracted = 0, skipped = 0;
+        var newPlugins = new List<string>();
         foreach (var fullName in resourceNames)
         {
             // 解析: ikun_installer.DeployResources.startup.custom.men -> startup\custom.men
@@ -613,18 +633,31 @@ public partial class Form1 : Form
             var targetPath = Path.Combine(subDir!, relPath);
             Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
 
+            if (subDir == appDir && relPath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) &&
+                !relPath.Equals("ikun_updater.dll", StringComparison.OrdinalIgnoreCase) && !File.Exists(targetPath))
+                newPlugins.Add(Path.GetFileNameWithoutExtension(relPath));
+
             using var stream = asm.GetManifestResourceStream(fullName);
             if (stream == null)
             {
                 Log($"  ✗ 无法读取流: {relPath}", Color.Red);
                 continue;
             }
-            using var fs = File.Create(targetPath);
-            stream.CopyTo(fs);
+            using var buffer = new MemoryStream();
+            stream.CopyTo(buffer);
+            try
+            {
+                DeploymentLayout.WriteFileAtomic(targetPath, buffer.ToArray());
+            }
+            catch (IOException ex) when (relPath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new IOException($"无法热更新 {relPath}。请关闭该插件窗口后重试，旧文件已保留。", ex);
+            }
             Log($"  ✓ {relPath}", Color.DarkGray);
             extracted++;
         }
         Log($"  已释放 {extracted} 个文件 (跳过 {skipped} 个)", Color.Green);
+        return newPlugins.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(name => name).ToList();
     }
 
     private void RegisterCustomDirs(string datFile, string activeRoot)

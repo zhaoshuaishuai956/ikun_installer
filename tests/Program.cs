@@ -55,6 +55,35 @@ using (var nextCheck = UpdateCheckInstanceGuard.TryAcquire(updateMutexName))
 }
 Console.WriteLine("update-check single-instance guard: PASS");
 
+// ============ 热更新部署目录测试 ============
+var hotTools = Path.Combine(Path.GetTempPath(), $"ikun-hot-root-{Guid.NewGuid():N}");
+var hotRoot = Path.Combine(hotTools, "deployments", "2.1.0-active");
+var hotLines = new[] { @"D:\IndependentTool", DeploymentLayout.Marker, hotRoot };
+Require(DeploymentLayout.FindActiveRoot(hotLines, hotTools) == Path.GetFullPath(hotRoot),
+    "未能找到已注册的热更新部署目录");
+Require(DeploymentLayout.FindActiveRoot(new[] { hotTools }, hotTools) == Path.GetFullPath(hotTools),
+    "未兼容早期直接注册的工具箱根目录");
+Require(DeploymentLayout.FindActiveRoot(new[] { @"D:\IndependentTool" }, hotTools) == null,
+    "误将无关 NX 工具目录识别为热更新目录");
+Directory.CreateDirectory(hotRoot);
+var atomicTarget = Path.Combine(hotRoot, "application", "plugin.dll");
+DeploymentLayout.WriteFileAtomic(atomicTarget, new byte[] { 1, 2, 3 });
+if (OperatingSystem.IsWindows())
+{
+    using var loadedPlugin = new FileStream(atomicTarget, FileMode.Open, FileAccess.Read, FileShare.Read);
+    var lockedUpdateRejected = false;
+    try { DeploymentLayout.WriteFileAtomic(atomicTarget, new byte[] { 9 }); }
+    catch (IOException) { lockedUpdateRejected = true; }
+    catch (UnauthorizedAccessException) { lockedUpdateRejected = true; }
+    Require(lockedUpdateRejected, "不得覆盖正在使用的插件 DLL");
+    Require(File.ReadAllBytes(atomicTarget).SequenceEqual(new byte[] { 1, 2, 3 }),
+        "热更新失败时未保留旧 DLL");
+}
+DeploymentLayout.WriteFileAtomic(atomicTarget, new byte[] { 4, 5 });
+Require(File.ReadAllBytes(atomicTarget).SequenceEqual(new byte[] { 4, 5 }), "原子热覆盖失败");
+Directory.Delete(hotTools, recursive: true);
+Console.WriteLine("in-place hot-update deployment: PASS");
+
 // ============ 部署槽测试 (既有) ============
 var sandbox = Path.Combine(Path.GetTempPath(), $"ikun-layout-test-{Guid.NewGuid():N}");
 Directory.CreateDirectory(sandbox);
