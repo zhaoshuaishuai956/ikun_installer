@@ -12,6 +12,7 @@ G7: 菜单文件 GBK 往返一致 + 无 U+FFFD + 结构合法 (BUTTON 块配对/
 import json
 import os
 import re
+import struct
 import sys
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -74,6 +75,22 @@ def parse_menu(text):
     if cur is not None:
         buttons.append(cur)
     return buttons
+
+
+def check_plugin_bmp(path, repo):
+    """G5c: enforce the fixed NX menu bitmap format, not merely file presence."""
+    try:
+        with open(path, "rb") as f:
+            header = f.read(54)
+        if len(header) < 54 or header[:2] != b"BM":
+            err("G5c: %s 的图标不是 BMP: %s" % (repo, os.path.basename(path)))
+            return
+        dib_size, width, height, planes, bits = struct.unpack_from("<IiiHH", header, 14)
+        if dib_size < 40 or width != 24 or abs(height) != 24 or planes != 1 or bits != 24:
+            err("G5c: %s 的图标须为 24x24、24 位 BMP，实为 %sx%s、%s 位: %s" %
+                (repo, width, height, bits, os.path.basename(path)))
+    except OSError as ex:
+        err("G5c: 无法读取 %s 图标: %s" % (repo, ex))
 
 
 def main():
@@ -149,6 +166,8 @@ def main():
                 err("G5: %s 的 BITMAP=%s, 应为 %s (规范 §4.1/M4 归一)" % (repo, b["bitmap"], want))
             elif not os.path.exists(os.path.join(STARTUP, want)):
                 err("G5: %s 引用图标 %s 不存在 (CI 应已生成)" % (repo, want))
+            else:
+                check_plugin_bmp(os.path.join(STARTUP, want), repo)
     for b in act2btn.get("ikun_updater.dll", []):
         if b["bitmap"] != "ikun_tools.bmp":
             err("G5: ikun_updater 的 BITMAP 应为 ikun_tools.bmp, 实为 %s" % b["bitmap"])
