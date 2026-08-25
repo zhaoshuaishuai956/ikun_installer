@@ -16,6 +16,14 @@ NX 插件标准化发布安装器：打包、部署和安装 AiKun Toolbox 集�
 
 多个 NX 插件需要统一发布和管理，此安装器自动化打包、部署、菜单配置和版本管理流程。
 
+## 开发规范
+
+- 唯一权威规范：`docs/NX二次开发权威规范.md`
+- AI 开发提示词：`docs/AI-NX二次开发提示词.md`
+- 子项目执行摘要：`docs/子项目开发规范.md`
+- NX 技术知识、流程、踩坑和模板：`docs/nx-development/`
+- 历史规范与对抗审查证据：`docs/governance/`（不具现行规范效力）
+
 ## Run — 如何运行
 
 1. 从本仓库 **Releases → latest** 下载 `ikun_installer.exe` 运行安装（日常唯一通道，见「自动打包」节）
@@ -69,6 +77,8 @@ dotnet build ikun_installer.csproj -c Release
 1. `plugins.json` 登记（repo + ref）；
 2. `DeployResources/startup/` 追加菜单/图标（GBK 编码，LABEL=该仓 `plugin.meta` 的 `name_cn`，见 `custom.men`/`ikun.rtb`）；
 3. 新插件仓库放 `.gitea/workflows/notify-installer.yml`（从权威模板复制，仅允许定制 paths）。
+4. 中文 `name_cn` 必须正好四个汉字；复制 `docs/nx-development/templates/ikun_update_check.hpp`，
+   在 `ufusr` 的 `UF_initialize()` 前调用 `CheckOnceOnFirstPluginUse()`，并保持 `UF_UNLOAD_IMMEDIATELY` 以支持热更新。
 
 **额外资源**（不止 dll/dlx）：在子项目根放 `ikun-deploy.txt`，每行一个 glob（如 `*.dll`/`*.dlx`/`*.dat`/`*.cfg`）；缺省为 `*.dll *.dlx *.dat`。文件扁平部署到 `application/`。
 

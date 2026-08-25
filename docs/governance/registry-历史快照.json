@@ -1,0 +1,166 @@
+{
+  "schema": 1,
+  "generated_by": "verify-repo.ps1",
+  "generated_at": "2026-08-16",
+  "spec": {
+    "host": "ikun_dev_standard",
+    "file": "ikun-整体开发规范-v1.0.md"
+  },
+  "hub": "ikun_installer",
+  "plugins": [
+    {
+      "repo": "MultiEntityNester",
+      "in_ikun": true,
+      "status": "GREEN",
+      "files": {
+        "meta": true,
+        "changelog": true,
+        "build": true,
+        "notify": true,
+        "license": true,
+        "gitattributes": true,
+        "gitignore": true
+      }
+    },
+    {
+      "repo": "block_boss_layout",
+      "in_ikun": true,
+      "status": "GREEN",
+      "files": {
+        "meta": true,
+        "changelog": true,
+        "build": true,
+        "notify": true,
+        "license": true,
+        "gitattributes": true,
+        "gitignore": true
+      }
+    },
+    {
+      "repo": "ejector_layout",
+      "in_ikun": true,
+      "status": "GREEN",
+      "files": {
+        "meta": true,
+        "changelog": true,
+        "build": true,
+        "notify": true,
+        "license": true,
+        "gitattributes": true,
+        "gitignore": true
+      }
+    },
+    {
+      "repo": "pmi_hole_dim",
+      "in_ikun": true,
+      "status": "GREEN",
+      "files": {
+        "meta": true,
+        "changelog": true,
+        "build": true,
+        "notify": true,
+        "license": true,
+        "gitattributes": true,
+        "gitignore": true
+      }
+    },
+    {
+      "repo": "single_line_text",
+      "in_ikun": true,
+      "status": "GREEN",
+      "files": {
+        "meta": true,
+        "changelog": true,
+        "build": true,
+        "notify": true,
+        "license": true,
+        "gitattributes": true,
+        "gitignore": true
+      }
+    },
+    {
+      "repo": "text_auto_layout",
+      "in_ikun": true,
+      "status": "GREEN",
+      "files": {
+        "meta": true,
+        "changelog": true,
+        "build": true,
+        "notify": true,
+        "license": true,
+        "gitattributes": true,
+        "gitignore": true
+      }
+    },
+    {
+      "repo": "plate_dwg_export",
+      "in_ikun": true,
+      "status": "GREEN",
+      "files": {
+        "meta": true,
+        "changelog": true,
+        "build": true,
+        "notify": true,
+        "license": true,
+        "gitattributes": true,
+        "gitignore": true
+      }
+    },
+    {
+      "repo": "smart_ejector_heater",
+      "in_ikun": true,
+      "status": "GREEN",
+      "files": {
+        "meta": true,
+        "changelog": true,
+        "build": true,
+        "notify": false,
+        "license": true,
+        "gitattributes": true,
+        "gitignore": true
+      }
+    },
+    {
+      "repo": "foam_cam",
+      "in_ikun": true,
+      "status": "GREEN",
+      "files": {
+        "meta": true,
+        "changelog": true,
+        "build": true,
+        "notify": false,
+        "license": true,
+        "gitattributes": true,
+        "gitignore": true
+      }
+    },
+    {
+      "repo": "riser_base_fillet",
+      "in_ikun": true,
+      "status": "GREEN",
+      "files": {
+        "meta": true,
+        "changelog": true,
+        "build": true,
+        "notify": false,
+        "license": true,
+        "gitattributes": true,
+        "gitignore": true
+      }
+    },
+    {
+      "repo": "runner_section_area",
+      "in_ikun": true,
+      "status": "GREEN",
+      "files": {
+        "meta": true,
+        "changelog": true,
+        "build": true,
+        "notify": false,
+        "license": true,
+        "gitattributes": true,
+        "gitignore": true
+      }
+    }
+  ]
+}

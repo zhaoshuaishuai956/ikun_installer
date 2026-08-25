@@ -1,0 +1,34 @@
+---
+name: nx-dev-handbook
+description: "NX 二次开发全模块知识库与实操流程（Siemens NX 1847 / NXOpen / UFUN）。覆盖建模、CAM(工序·刀路·后处理出G代码)、装配、制图、PMI标注、钣金，以及 Block Styler 对话框界面。提供：环境与要求预检清单、零→可加载 dll 的标准流程、踩坑总账（9 类：中文编码/控件读值/宏冲突/链接库/API坑含WCS/几何算法/流程协作/CAM/其它模块）、控件读值与各模块入口速查、可直接编译运行的模板工程；另含执行协议（需求确认卡/编译前自查/带关卡状态机）、报错决策表（报错关键字→修复动作）与完整范例，让轻量模型也能按「查表+照做+机器验证」交付。触发场景：NX二次开发环境配置、NX插件编译/链接/运行报错、NXOpen 或 UF_MODL API 用法、BlockStyler 控件读值、CAM 二次开发·工序创建·刀路生成·后处理、dll 加载失败、lib 链接遗漏(libnxopenuicpp/libnxopencpp_cam 等)、中文路径与编码问题、WCS 导致图元歪斜。是 nx-blockstyler-dev 技能的配套知识库。"
+---
+
+# NX 二次开发全模块知识库
+
+Siemens **NX 1847** 二次开发（NXOpen / UFUN）的单一可信知识库 + 实操流程。适用**全模块**：建模、CAM、装配、制图、PMI、钣金；界面用 Block Styler。
+
+**核心事实**：不管做哪个模块，dll 骨架、编译（`build.ps1`）、加载（Ctrl+U）这条主干**完全一致**；模块差异只在 `run()` 里调用的 API 命名空间和**追加的链接库**。
+
+## 何时用
+
+做 NX/UG 二次开发——写建模/CAM/装配/制图/PMI 插件、做对话框界面、排查编译链接运行报错、查 API 用法与控件读值时。不用于：不写代码的纯 NX 操作、其它 CAD 软件。
+
+## 工作流
+
+0. **全程遵守 [`05-执行协议.md`](05-执行协议.md)**（必读，很短）：需求确认卡未经用户确认不写代码；只拷 [`templates/`](templates/) 改写；编译前过自查表；报错抄关键字查 [`06-报错决策表.md`](06-报错决策表.md)，同一报错最多修 2 次；流程拿不准照 [`07-完整范例.md`](07-完整范例.md) 做。
+1. **先读坑账**：通读 [`03-踩坑总账.md`](03-踩坑总账.md) 的分类标题（跨模块共性 7 类 + CAM + 其它模块），标记本次必碰的（建模看 WCS、有控件看读值与编码、CAM 看余量/后处理）。**省这步 = 返工。**
+2. **对预检清单**：[`01-环境与要求.md`](01-环境与要求.md)——SDK/编译器/三必链库 + 按模块追加的库（CAM 加 `libnxopencpp_cam.lib`，装配 `_assemblies`，制图/PMI `_annotations`…）。
+3. **按标准流程做**：[`02-标准流程.md`](02-标准流程.md)——厘清需求 → 拷 [`templates/`](templates/) 改写 → `pwsh -File build.ps1` 编译 → `dumpbin /exports` 验证 → NX 里 Ctrl+U 加载。其它模块把建模那段换成对应 API 即可。
+4. **随手翻速查**：[`04-控件与读值速查.md`](04-控件与读值速查.md)——控件读值对照表、dlx 片段、UF 建模函数、**CAM 流程与各模块入口**（第八节）。
+
+## 最高频的几个坑（细节见 03）
+
+- **枚举控件读值用 `GetEnum` 不是 GetInteger**，否则运行时报"属性类型不正确"。
+- **中文喂控件一律 `NXString(text, NXString::UTF8)`**；枚举下拉项运行时 `SetEnumMembers`。
+- **漏 `libnxopenuicpp.lib`** → 一堆 LNK2019（Block Styler + CreateDialog 全在它）。
+- **WCS≠绝对系** → `UF_MODL_*` 新建图元按当前 WCS 定位会歪斜 → 用 `WcsGuard` 临时设绝对系。
+- **CAM**：余量要设在 WORKPIECE 的 `SetPartOffset`；后处理前必须先 `GenerateToolPath`，后处理器名要对得上。
+
+## 环境/目录出问题
+
+编译只需 VS2022 + NX SDK；`build.ps1` 自动探测 VS(vswhere) 与 NX(UGII_ROOT_DIR)，探测不到回退环境变量。更复杂的官方示例在 NX 安装目录 `UGOPEN\SampleNXOpenApplications\C++\`。

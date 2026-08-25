@@ -439,8 +439,7 @@ curl -sS -X POST "https://${GITEA_HOST}/api/v1/repos/${OWNER}/${REPO}/pulls" \
 
 ## 11. 参考文档
 
-本文件是权威行为规则。详细文档按规范 §2.2 分层存放于各权威源：
-- L3 整体规范（最高优先）：`ikun_dev_standard` 仓库 `ikun-整体开发规范-v1.0.md`
-- L1 工作流：`gitea-for-ai` 仓库 `docs/`（dev-standards.md / commit-guide.md / api-cheatsheet.md / troubleshooting.md / setup.md）
-- L2 知识库：`nx_dev_skill`（私有权威）/ `nx_dev_handbook`（公开镜像）
+爱坤工具箱的唯一权威规则是 `docs/NX二次开发权威规范.md`；NX 技术资料位于
+`docs/nx-development/`，AI 提示词位于 `docs/AI-NX二次开发提示词.md`。`docs/governance/`
+只保存历史证据，不具现行规范效力。若本文件与权威规范冲突，以权威规范为准。
 
