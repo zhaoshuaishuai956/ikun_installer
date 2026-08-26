@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -67,7 +68,7 @@ app.MapPost("/v1/register", async (HttpContext ctx, RegisterRequest request, Rat
     var ct = RequestCancellation(ctx);
     if (!autoEnroll && !await db.ConsumeEnrollmentAsync(request.EnrollmentCode!, ct)) return Results.BadRequest(new { error = "invalid_request" });
     var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
-    if (!await db.CreateDeviceAsync(installId, Security.Hash(token), ClientIp(ctx), ct)) return Results.BadRequest(new { error = "invalid_request" });
+    if (!await db.CreateDeviceAsync(installId, Security.Hash(token), IpResolver.ClientIp(ctx), ct)) return Results.BadRequest(new { error = "invalid_request" });
     return Results.Ok(new { install_id = installId, device_token = token });
 });
 
@@ -78,7 +79,7 @@ app.MapPost("/v1/events", async (HttpContext ctx, EventRequest request, RateLimi
     if (token is null || !Guid.TryParse(request.InstallId, out var installId)) return Results.Unauthorized();
     var tokenHash = Security.Hash(token);
     var ct = RequestCancellation(ctx);
-    if (!await db.TokenBelongsAsync(installId, tokenHash, ClientIp(ctx), ct)) { limits.InvalidToken(ctx); return Results.Unauthorized(); }
+    if (!await db.TokenBelongsAsync(installId, tokenHash, IpResolver.ClientIp(ctx), ct)) { limits.InvalidToken(ctx); return Results.Unauthorized(); }
     if (!limits.AllowIp(ctx, "events", 30, TimeSpan.FromMinutes(1)) || !limits.AllowToken(tokenHash, 10, TimeSpan.FromMinutes(1)) || !limits.AllowDaily(tokenHash, 200)) return TooManyResult.Instance;
     if (!Validation.ValidEvent(request)) return Results.BadRequest(new { error = "invalid_request" });
     await db.InsertEventAsync(request, ct);
@@ -92,7 +93,7 @@ app.MapPost("/v1/device-snapshot", async (HttpContext ctx, SnapshotRequest reque
     if (token is null || !Guid.TryParse(request.InstallId, out var installId)) return Results.Unauthorized();
     var tokenHash = Security.Hash(token);
     var ct = RequestCancellation(ctx);
-    if (!await db.TokenBelongsAsync(installId, tokenHash, ClientIp(ctx), ct)) { limits.InvalidToken(ctx); return Results.Unauthorized(); }
+    if (!await db.TokenBelongsAsync(installId, tokenHash, IpResolver.ClientIp(ctx), ct)) { limits.InvalidToken(ctx); return Results.Unauthorized(); }
     if (!limits.AllowIp(ctx, "snapshot", 10, TimeSpan.FromMinutes(1)) || !limits.AllowToken(tokenHash, 10, TimeSpan.FromMinutes(1))) return TooManyResult.Instance;
     if (!Validation.ValidSnapshot(request)) return Results.BadRequest(new { error = "invalid_request" });
     await db.InsertSnapshotAsync(request, ct);
@@ -101,7 +102,6 @@ app.MapPost("/v1/device-snapshot", async (HttpContext ctx, SnapshotRequest reque
 app.Run();
 
 static CancellationToken RequestCancellation(HttpContext c) => c.Items["request_token"] is CancellationToken t ? t : c.RequestAborted;
-static string ClientIp(HttpContext c) => c.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 static string? Bearer(HttpContext c) { var value = c.Request.Headers.Authorization.ToString(); return value.StartsWith("Bearer ", StringComparison.Ordinal) ? value[7..].Trim() : null; }
 public sealed record RegisterRequest([property: JsonPropertyName("enrollment_code")] string? EnrollmentCode, [property: JsonPropertyName("install_id")] string InstallId);
 public sealed record EventRequest([property: JsonPropertyName("event_id")] string EventId, [property: JsonPropertyName("install_id")] string InstallId, [property: JsonPropertyName("event_type")] string EventType, [property: JsonPropertyName("trigger_source")] string TriggerSource, [property: JsonPropertyName("installer_version")] string InstallerVersion, [property: JsonPropertyName("remote_version")] string? RemoteVersion, [property: JsonPropertyName("nx_version")] string? NxVersion, [property: JsonPropertyName("os_version")] string OsVersion, [property: JsonPropertyName("result")] string Result, [property: JsonPropertyName("occurred_at")] DateTimeOffset OccurredAt);
@@ -143,11 +143,11 @@ public sealed class RateLimitState
     readonly ConcurrentDictionary<string, DateTimeOffset> blocked = new();
     int globalCount; DateTimeOffset globalStart = DateTimeOffset.UtcNow;
     public bool AllowGlobal() { lock (this) { var n = DateTimeOffset.UtcNow; if (n - globalStart >= TimeSpan.FromSeconds(1)) { globalStart = n; globalCount = 0; } return ++globalCount <= 200; } }
-    public bool AllowIp(HttpContext c, string kind, int max, TimeSpan window) => Allow(kind + ":" + (c.Connection.RemoteIpAddress?.ToString() ?? "unknown"), max, window);
+    public bool AllowIp(HttpContext c, string kind, int max, TimeSpan window) => Allow(kind + ":" + IpResolver.ClientIp(c), max, window);
     public bool AllowToken(string hash, int max, TimeSpan window) => Allow("token:" + hash, max, window);
     public bool AllowDaily(string hash, int max) { var day = DateTimeOffset.UtcNow.Date; var x = daily.AddOrUpdate(hash, (day, 1), (_, old) => old.Day == day ? (day, old.Count + 1) : (day, 1)); return x.Count <= max; }
-    public bool IsBlocked(HttpContext c) => c.Connection.RemoteIpAddress is { } ip && blocked.TryGetValue(ip.ToString(), out var until) && until > DateTimeOffset.UtcNow;
-    public void InvalidToken(HttpContext c) { var key = "invalid:" + (c.Connection.RemoteIpAddress?.ToString() ?? "unknown"); if (!Allow(key, 20, TimeSpan.FromMinutes(5))) blocked[key[8..]] = DateTimeOffset.UtcNow.AddMinutes(15); }
+    public bool IsBlocked(HttpContext c) => blocked.TryGetValue(IpResolver.ClientIp(c), out var until) && until > DateTimeOffset.UtcNow;
+    public void InvalidToken(HttpContext c) { var key = "invalid:" + IpResolver.ClientIp(c); if (!Allow(key, 20, TimeSpan.FromMinutes(5))) blocked[key[8..]] = DateTimeOffset.UtcNow.AddMinutes(15); }
     bool Allow(string key, int max, TimeSpan window) { var now = DateTimeOffset.UtcNow; var x = counters.AddOrUpdate(key, (now, 1), (_, old) => now - old.Start >= window ? (now, 1) : (old.Start, old.Count + 1)); return x.Count <= max; }
 }
 public sealed class TelemetryStore
@@ -217,3 +217,22 @@ public sealed class DashboardStore
     }
 }
 public partial class Program { }
+static class IpResolver
+{
+    public static string ClientIp(HttpContext c)
+    {
+        // Lucky is the only trusted reverse proxy in front of this service. Prefer
+        // its forwarded client address, but never trust forwarded headers from a
+        // direct internet client.
+        var remote = c.Connection.RemoteIpAddress;
+        var trustedProxy = remote is not null && (IPAddress.IsLoopback(remote) || remote.Equals(IPAddress.Parse("10.0.0.1")));
+        if (trustedProxy)
+        {
+            var forwarded = c.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+            var candidate = forwarded?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault()
+                ?? c.Request.Headers["X-Real-IP"].FirstOrDefault();
+            if (IPAddress.TryParse(candidate, out var parsed)) return parsed.ToString();
+        }
+        return remote?.ToString() ?? "unknown";
+    }
+}
