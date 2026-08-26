@@ -8,7 +8,7 @@
 - 内网后端：`http://10.0.0.8:5080`
 - 存活检查：`GET /health/live`
 - 就绪检查：`GET /health/ready`（不应公开给普通用户）
-- 管理后台：`https://td.h.zss.fan:2233/dashboard`（独立只读服务端口，无登录密码）
+- 管理后台：`https://td.h.zss.fan:2233`（独立只读服务端口，无登录密码）
 
 Lucky 代理仅转发 `/v1/register`、`/v1/events` 和 `/v1/device-snapshot`，并设置 `X-Forwarded-Proto`、`X-Forwarded-For` 和目标 Host。
 
