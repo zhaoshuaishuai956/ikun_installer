@@ -184,7 +184,13 @@ public sealed class TelemetryStore
 public sealed class DashboardStore
 {
     private readonly string? connectionString;
-    public DashboardStore(IConfiguration config) => connectionString = Environment.GetEnvironmentVariable("IKUN_TELEMETRY_DB") ?? config["IKUN_TELEMETRY_DB"];
+    private readonly byte[] encryptionKey;
+    public DashboardStore(IConfiguration config)
+    {
+        connectionString = Environment.GetEnvironmentVariable("IKUN_TELEMETRY_DB") ?? config["IKUN_TELEMETRY_DB"];
+        var encoded = Environment.GetEnvironmentVariable("IKUN_TELEMETRY_ENCRYPTION_KEY") ?? "";
+        try { encryptionKey = Convert.FromBase64String(encoded); } catch { encryptionKey = []; }
+    }
     private async Task<NpgsqlConnection> Open(CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(connectionString)) throw new InvalidOperationException("not configured");
@@ -210,10 +216,25 @@ public sealed class DashboardStore
     {
         var result = new List<object>();
         await using var c = await Open(ct);
-        await using var q = new NpgsqlCommand("SELECT install_id, last_ip::text, last_seen_at, created_at, disabled_at FROM telemetry.devices ORDER BY COALESCE(last_seen_at, created_at) DESC", c);
+        await using var q = new NpgsqlCommand("SELECT d.install_id, d.last_ip::text, d.last_seen_at, d.created_at, d.disabled_at, s.computer_name_cipher, s.computer_name_nonce FROM telemetry.devices d LEFT JOIN LATERAL (SELECT computer_name_cipher, computer_name_nonce FROM telemetry.device_snapshots WHERE install_id=d.install_id ORDER BY occurred_at DESC LIMIT 1) s ON true ORDER BY COALESCE(d.last_seen_at, d.created_at) DESC", c);
         await using var rows = await q.ExecuteReaderAsync(ct);
-        while (await rows.ReadAsync(ct)) result.Add(new { install_id = rows.GetGuid(0), ip = rows.IsDBNull(1) ? null : rows.GetString(1), last_seen_at = rows.IsDBNull(2) ? (DateTime?)null : rows.GetDateTime(2), created_at = rows.GetDateTime(3), status = rows.IsDBNull(4) ? "active" : "disabled" });
+        while (await rows.ReadAsync(ct))
+        {
+            var computerName = rows.IsDBNull(5) ? null : Decrypt(rows.GetFieldValue<byte[]>(5), rows.GetFieldValue<byte[]>(6));
+            result.Add(new { install_id = rows.GetGuid(0), computer_name = computerName, ip = rows.IsDBNull(1) ? null : rows.GetString(1), last_seen_at = rows.IsDBNull(2) ? (DateTime?)null : rows.GetDateTime(2), created_at = rows.GetDateTime(3), status = rows.IsDBNull(4) ? "active" : "disabled" });
+        }
         return result;
+    }
+    string? Decrypt(byte[] cipherWithTag, byte[] nonce)
+    {
+        if (encryptionKey.Length != 32 || cipherWithTag.Length < 16) return null;
+        try
+        {
+            var cipher = cipherWithTag[..^16]; var tag = cipherWithTag[^16..]; var plain = new byte[cipher.Length];
+            using var aes = new AesGcm(encryptionKey, 16); aes.Decrypt(nonce, cipher, tag, plain, Encoding.UTF8.GetBytes("ikun-telemetry-v1"));
+            return Encoding.UTF8.GetString(plain);
+        }
+        catch { return null; }
     }
 }
 public partial class Program { }
