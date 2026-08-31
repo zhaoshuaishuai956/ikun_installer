@@ -47,6 +47,12 @@ MENU IKUN_TOOLS_NAME
   ACTIONS text_auto_layout.dll
   SEPARATOR
 
+  BUTTON IKUN_TYPELAYOUT
+  LABEL 活字排版
+  BITMAP ikun_type_layout.bmp
+  ACTIONS type_layout.dll
+  SEPARATOR
+
   BUTTON IKUN_PLATEDWG
   LABEL 板面导出
   BITMAP ikun_plate_dwg_export.bmp

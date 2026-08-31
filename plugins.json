@@ -8,6 +8,7 @@
     { "repo": "pmi_hole_dim",       "ref": "master" },
     { "repo": "single_line_text",   "ref": "master" },
     { "repo": "text_auto_layout",   "ref": "master" },
-    { "repo": "plate_dwg_export",   "ref": "master" }
+    { "repo": "plate_dwg_export",   "ref": "master" },
+    { "repo": "type_layout",        "ref": "master" }
   ]
 }
