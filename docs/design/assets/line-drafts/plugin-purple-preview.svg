@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720">
+  <title>爱坤工具箱在册业务插件紫色品牌上色预览</title>
+  <desc>沿用已确认线稿，以紫色品牌色板进行语义分层上色，并作为正式 32 像素资源的设计总览。</desc>
+  <defs>
+    <style>
+      .page-title { font: 700 28px "Microsoft YaHei", sans-serif; fill: #433A5E; }
+      .page-note { font: 400 15px "Microsoft YaHei", sans-serif; fill: #6F6884; }
+      .panel { fill: #fff; stroke: #DCD5EB; stroke-width: 1.5; rx: 12; }
+      .safe { fill: #FBF9FF; stroke: #E4D9F8; stroke-width: 1; stroke-dasharray: 5 5; }
+      .cn { font: 700 21px "Microsoft YaHei", sans-serif; fill: #433A5E; }
+      .id { font: 400 13px Consolas, monospace; fill: #756C8A; }
+      .tag { font: 400 13px "Microsoft YaHei", sans-serif; fill: #625976; }
+      .icon { fill: none; stroke: var(--stk, #433A5E); stroke-width: var(--sw, 1.35); stroke-linecap: round; stroke-linejoin: round; }
+      .guide { fill: none; stroke: var(--aux, #B6A6E0); stroke-width: var(--guide-sw, 1.05); stroke-linecap: round; stroke-linejoin: round; }
+      .surface { fill: var(--top, #EDE6FC); }
+      .side-fill { fill: var(--side, #B6A6E0); }
+      .feature-fill { fill: var(--pur, #9061F0); }
+      .cap-fill { fill: var(--cap, #C9B6FA); }
+      .hole-fill { fill: var(--white, #FFFFFF); }
+      .feature-line { stroke: var(--pur-line, #9061F0); }
+      .accent-line { stroke: var(--acc-line, #7C57E5); }
+      .purple-icon {
+        --stk: #433A5E;
+        --aux: #B6A6E0;
+        --top: #EDE6FC;
+        --side: #B6A6E0;
+        --pur: #9061F0;
+        --cap: #C9B6FA;
+        --white: #FFFFFF;
+        --pur-line: #9061F0;
+        --acc-line: #7C57E5;
+        --sw: 1.35;
+        --guide-sw: 1.05;
+      }
+    </style>
+
+    <symbol id="multi-entity-nester" viewBox="0 0 32 32">
+      <g class="icon">
+        <rect class="surface" x="3.5" y="3.5" width="25" height="25" rx="1.5"/>
+        <path class="feature-fill" d="M6.5 6.5h7l2.2 3.7-3.4 4.1H6.5z"/>
+        <path class="cap-fill" d="M6.5 17h5.2v3.1h3.4v6H6.5z"/>
+        <path class="side-fill" d="M18 6.5c5.2 0 8 2.9 8 7.1 0 2.3-1.1 3.8-3 5.2l3 2.7v4.6h-8v-5.7l2.7-2.2c1.2-1 1.8-2.2 1.8-3.6 0-2.1-1.5-3.5-4.5-3.5z"/>
+      </g>
+    </symbol>
+    <symbol id="block-boss-layout" viewBox="0 0 32 32">
+      <g class="icon">
+        <path class="side-fill" d="M3.8 18.2 18 14l10.2 5.2L14 23.5z"/>
+        <path d="M3.8 18.2v4.2L14 27.6l14.2-4.3v-4.1"/>
+        <path class="surface" d="M6 10.8 18 7.2l8.4 4.3L14.3 15z"/>
+        <path d="M6 10.8v4.1M26.4 11.5v3.9"/>
+        <ellipse class="cap-fill" cx="16.1" cy="10.9" rx="5" ry="2.5"/>
+        <ellipse class="hole-fill" cx="16.1" cy="10.9" rx="2" ry="1"/>
+        <path class="feature-fill" d="M11.1 10.9v3.1c0 1.4 2.2 2.5 5 2.5s5-1.1 5-2.5v-3.1"/>
+      </g>
+    </symbol>
+    <symbol id="ejector-layout" viewBox="0 0 32 32">
+      <g class="icon">
+        <path class="surface" d="M4.5 20h23v5.5h-23z"/>
+        <path d="M4.5 20 8 17h19.5M27.5 20v5.5"/>
+        <ellipse class="cap-fill" cx="9" cy="17" rx="2.4" ry="1.2"/>
+        <ellipse class="cap-fill" cx="16" cy="17" rx="2.4" ry="1.2"/>
+        <ellipse class="cap-fill" cx="23" cy="17" rx="2.4" ry="1.2"/>
+        <path class="feature-line" d="M6.6 17V10M11.4 17V10M13.6 17V7.5M18.4 17V7.5M20.6 17V11.5M25.4 17V11.5"/>
+        <path class="accent-line" d="M16 5V2.8M13.7 5.1 16 2.8l2.3 2.3"/>
+      </g>
+    </symbol>
+    <symbol id="pmi-hole-dim" viewBox="0 0 32 32">
+      <g class="icon">
+        <rect class="surface" x="8" y="8" width="17" height="17" rx="1"/>
+        <circle class="hole-fill" cx="13" cy="14" r="2.5"/>
+        <circle class="hole-fill" cx="20.5" cy="20" r="2.5"/>
+        <path class="accent-line" d="M8 5h17M8 3.3v3.4M25 3.3v3.4M10.3 3.8 8 5l2.3 1.2M22.7 3.8 25 5l-2.3 1.2"/>
+        <path class="accent-line" d="M5 8v17M3.3 8h3.4M3.3 25h3.4M3.8 10.3 5 8l1.2 2.3M3.8 22.7 5 25l1.2-2.3"/>
+      </g>
+    </symbol>
+    <symbol id="single-line-text" viewBox="0 0 32 32">
+      <g class="icon">
+        <path class="feature-line" d="M8 24.5 15.5 6.8 23 24.5M11 18h9"/>
+        <path class="accent-line" d="M5 27.5h22"/>
+        <path class="guide" d="M5 5.5h4M5 5.5v4"/>
+      </g>
+    </symbol>
+    <symbol id="text-auto-layout" viewBox="0 0 32 32">
+      <g class="icon">
+        <path class="feature-line" d="M4.5 14 7.2 7.6 9.9 14M5.5 11.6h3.4"/>
+        <path class="feature-line" d="M13 7.6V14h3.1c2.6 0 2.6-3.2 0-3.2H13M15.8 10.8c2.4 0 2.4-3.2 0-3.2H13"/>
+        <path class="feature-line" d="M4.5 26.6v-6.4l5.4 6.4v-6.4M13.2 20.2l6 6.4M19.2 20.2l-6 6.4"/>
+        <path class="accent-line" d="M25.5 24V8M23.3 10.2 25.5 8l2.2 2.2"/>
+      </g>
+    </symbol>
+    <symbol id="plate-dwg-export" viewBox="0 0 32 32">
+      <g class="icon">
+        <path class="surface" d="M4.5 5.5h18v5.3a3 3 0 0 0 3 3h2v12h-23z"/>
+        <circle class="hole-fill" cx="10" cy="11" r="2.8"/>
+        <path class="accent-line" d="M15 20h12.5M23.5 16l4 4-4 4"/>
+      </g>
+    </symbol>
+    <symbol id="type-layout" viewBox="0 0 32 32">
+      <g class="icon">
+        <rect class="surface" x="3.5" y="4.5" width="7" height="10" rx=".6"/>
+        <rect class="surface" x="12.5" y="4.5" width="7" height="10" rx=".6"/>
+        <rect class="surface" x="21.5" y="4.5" width="7" height="10" rx=".6"/>
+        <rect class="side-fill" x="3.5" y="17.5" width="7" height="10" rx=".6"/>
+        <rect class="side-fill" x="12.5" y="17.5" width="7" height="10" rx=".6"/>
+        <rect class="side-fill" x="21.5" y="17.5" width="7" height="10" rx=".6"/>
+        <path class="feature-line" d="M7 7v5M15 8.5c0-1.8 3-1.8 3 0 0 1.4-3 1.6-3 3.5h3M24 7h2.5L24 12h2.5M6 20v5M5 20h2.2c2.2 0 2.2 2.5 0 2.5H5M5 22.5h2.4c2.4 0 2.4 2.5 0 2.5H5M15 25l1.5-5 1.5 5M15.7 23h1.6M24.5 20v5M23 21.5l1.5-1.5 1.5 1.5"/>
+      </g>
+    </symbol>
+  </defs>
+
+  <rect width="1200" height="720" fill="#F7F4FC"/>
+  <text x="50" y="45" class="page-title">已有插件功能图标 · 紫色品牌上色 v1</text>
+  <text x="50" y="70" class="page-note">对象保持浅紫中性，功能特征使用亮紫，动作箭头使用强调紫；正式部署 BMP 与独立 SVG 同源。</text>
+
+  <g transform="translate(35 95)">
+    <rect class="panel" width="270" height="275"/>
+    <rect class="safe" x="70" y="25" width="130" height="130" rx="4"/>
+    <use class="purple-icon" href="#multi-entity-nester" x="75" y="30" width="120" height="120"/>
+    <text x="22" y="196" class="cn">实体排样</text>
+    <text x="22" y="220" class="id">MultiEntityNester</text>
+    <text x="22" y="247" class="tag">异形实体 · 紧密嵌套</text>
+  </g>
+  <g transform="translate(325 95)">
+    <rect class="panel" width="270" height="275"/>
+    <rect class="safe" x="70" y="25" width="130" height="130" rx="4"/>
+    <use class="purple-icon" href="#block-boss-layout" x="75" y="30" width="120" height="120"/>
+    <text x="22" y="196" class="cn">定位凸台</text>
+    <text x="22" y="220" class="id">block_boss_layout</text>
+    <text x="22" y="247" class="tag">配合板 · 中心孔凸台</text>
+  </g>
+  <g transform="translate(615 95)">
+    <rect class="panel" width="270" height="275"/>
+    <rect class="safe" x="70" y="25" width="130" height="130" rx="4"/>
+    <use class="purple-icon" href="#ejector-layout" x="75" y="30" width="120" height="120"/>
+    <text x="22" y="196" class="cn">顶针布局</text>
+    <text x="22" y="220" class="id">ejector_layout</text>
+    <text x="22" y="247" class="tag">多根顶针 · 同向顶出</text>
+  </g>
+  <g transform="translate(905 95)">
+    <rect class="panel" width="270" height="275"/>
+    <rect class="safe" x="70" y="25" width="130" height="130" rx="4"/>
+    <use class="purple-icon" href="#pmi-hole-dim" x="75" y="30" width="120" height="120"/>
+    <text x="22" y="196" class="cn">孔位标注</text>
+    <text x="22" y="220" class="id">pmi_hole_dim</text>
+    <text x="22" y="247" class="tag">孔特征 · 双向尺寸</text>
+  </g>
+
+  <g transform="translate(35 390)">
+    <rect class="panel" width="270" height="275"/>
+    <rect class="safe" x="70" y="25" width="130" height="130" rx="4"/>
+    <use class="purple-icon" href="#single-line-text" x="75" y="30" width="120" height="120"/>
+    <text x="22" y="196" class="cn">单线刻字</text>
+    <text x="22" y="220" class="id">single_line_text</text>
+    <text x="22" y="247" class="tag">开放字形 · 中心线</text>
+  </g>
+  <g transform="translate(325 390)">
+    <rect class="panel" width="270" height="275"/>
+    <rect class="safe" x="70" y="25" width="130" height="130" rx="4"/>
+    <use class="purple-icon" href="#text-auto-layout" x="75" y="30" width="120" height="120"/>
+    <text x="22" y="196" class="cn">文字排版</text>
+    <text x="22" y="220" class="id">text_auto_layout</text>
+    <text x="22" y="247" class="tag">多行文字 · 统一拉伸</text>
+  </g>
+  <g transform="translate(615 390)">
+    <rect class="panel" width="270" height="275"/>
+    <rect class="safe" x="70" y="25" width="130" height="130" rx="4"/>
+    <use class="purple-icon" href="#plate-dwg-export" x="75" y="30" width="120" height="120"/>
+    <text x="22" y="196" class="cn">板面导出</text>
+    <text x="22" y="220" class="id">plate_dwg_export</text>
+    <text x="22" y="247" class="tag">板面轮廓 · 向外导出</text>
+  </g>
+  <g transform="translate(905 390)">
+    <rect class="panel" width="270" height="275"/>
+    <rect class="safe" x="70" y="25" width="130" height="130" rx="4"/>
+    <use class="purple-icon" href="#type-layout" x="75" y="30" width="120" height="120"/>
+    <text x="22" y="196" class="cn">活字排版</text>
+    <text x="22" y="220" class="id">type_layout</text>
+    <text x="22" y="247" class="tag">等规格活字 · 紧凑矩阵</text>
+  </g>
+</svg>

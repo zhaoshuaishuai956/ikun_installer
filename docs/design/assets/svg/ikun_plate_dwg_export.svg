@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-  <title>single-line-text</title>
+  <title>plate-dwg-export</title>
   <style>
   .icon { fill: none; stroke: #433A5E; stroke-width: 1.35; stroke-linecap: round; stroke-linejoin: round; }
   .guide { fill: none; stroke: #B6A6E0; stroke-width: 1.05; stroke-linecap: round; stroke-linejoin: round; }
@@ -11,5 +11,5 @@
   .hole-fill { fill: #FFFFFF; }
   .feature-line { stroke: #9061F0; }
   .accent-line { stroke: #7C57E5; }  </style>
-<g class="icon" xmlns="http://www.w3.org/2000/svg"><path class="feature-line" d="M8 24.5 15.5 6.8 23 24.5M11 18h9" /><path class="accent-line" d="M5 27.5h22" /><path class="guide" d="M5 5.5h4M5 5.5v4" /></g>
+<g class="icon" xmlns="http://www.w3.org/2000/svg"><path class="surface" d="M4.5 5.5h18v5.3a3 3 0 0 0 3 3h2v12h-23z" /><circle class="hole-fill" cx="10" cy="11" r="2.8" /><path class="accent-line" d="M15 20h12.5M23.5 16l4 4-4 4" /></g>
 </svg>

@@ -1,1 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><polygon points="16.00,20.20 1.80,12.00 1.80,15.20 16.00,23.40" fill="#B6A6E0" stroke="#433A5E" stroke-width="1.3" stroke-linejoin="round"/><polygon points="30.20,12.00 16.00,20.20 16.00,23.40 30.20,15.20" fill="#9061F0" stroke="#433A5E" stroke-width="1.3" stroke-linejoin="round"/><polygon points="16.00,3.80 30.20,12.00 16.00,20.20 1.80,12.00" fill="#EDE6FC" stroke="#433A5E" stroke-width="1.3" stroke-linejoin="round"/><path d="M 13.02,12.00 L 13.02,7.80 A 2.98 1.49 0 0 0 18.98,7.80 L 18.98,12.00 A 2.98 1.49 0 0 1 13.02,12.00 Z" fill="#9061F0" stroke="#433A5E" stroke-width="1.20" stroke-linejoin="round"/><ellipse cx="16.00" cy="7.80" rx="2.98" ry="1.49" fill="#C9B6FA" stroke="#433A5E" stroke-width="1.3"/><ellipse cx="16.00" cy="12.00" rx="1.14" ry="0.57" fill="#EFEAFD" stroke="#433A5E" stroke-width="1.3"/><ellipse cx="16.00" cy="12.00" rx="0.62" ry="0.31" fill="#FFFFFF"/><g stroke="#6A44D6" stroke-width="1.5" stroke-linecap="round"><line x1="13.8" y1="3.400000000000001" x2="18.2" y2="3.400000000000001"/><line x1="16.0" y1="1.2000000000000006" x2="16.0" y2="5.600000000000001"/></g></svg>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <title>block-boss-layout</title>
+  <style>
+  .icon { fill: none; stroke: #433A5E; stroke-width: 1.35; stroke-linecap: round; stroke-linejoin: round; }
+  .guide { fill: none; stroke: #B6A6E0; stroke-width: 1.05; stroke-linecap: round; stroke-linejoin: round; }
+  .surface { fill: #EDE6FC; }
+  .side-fill { fill: #B6A6E0; }
+  .feature-fill { fill: #9061F0; }
+  .cap-fill { fill: #C9B6FA; }
+  .hole-fill { fill: #FFFFFF; }
+  .feature-line { stroke: #9061F0; }
+  .accent-line { stroke: #7C57E5; }  </style>
+<g class="icon" xmlns="http://www.w3.org/2000/svg"><path class="side-fill" d="M3.8 18.2 18 14l10.2 5.2L14 23.5z" /><path d="M3.8 18.2v4.2L14 27.6l14.2-4.3v-4.1" /><path class="surface" d="M6 10.8 18 7.2l8.4 4.3L14.3 15z" /><path d="M6 10.8v4.1M26.4 11.5v3.9" /><ellipse class="cap-fill" cx="16.1" cy="10.9" rx="5" ry="2.5" /><ellipse class="hole-fill" cx="16.1" cy="10.9" rx="2" ry="1" /><path class="feature-fill" d="M11.1 10.9v3.1c0 1.4 2.2 2.5 5 2.5s5-1.1 5-2.5v-3.1" /></g>
+</svg>

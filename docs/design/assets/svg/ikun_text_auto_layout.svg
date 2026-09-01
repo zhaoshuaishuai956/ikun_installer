@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-  <title>single-line-text</title>
+  <title>text-auto-layout</title>
   <style>
   .icon { fill: none; stroke: #433A5E; stroke-width: 1.35; stroke-linecap: round; stroke-linejoin: round; }
   .guide { fill: none; stroke: #B6A6E0; stroke-width: 1.05; stroke-linecap: round; stroke-linejoin: round; }
@@ -11,5 +11,5 @@
   .hole-fill { fill: #FFFFFF; }
   .feature-line { stroke: #9061F0; }
   .accent-line { stroke: #7C57E5; }  </style>
-<g class="icon" xmlns="http://www.w3.org/2000/svg"><path class="feature-line" d="M8 24.5 15.5 6.8 23 24.5M11 18h9" /><path class="accent-line" d="M5 27.5h22" /><path class="guide" d="M5 5.5h4M5 5.5v4" /></g>
+<g class="icon" xmlns="http://www.w3.org/2000/svg"><path class="feature-line" d="M4.5 14 7.2 7.6 9.9 14M5.5 11.6h3.4" /><path class="feature-line" d="M13 7.6V14h3.1c2.6 0 2.6-3.2 0-3.2H13M15.8 10.8c2.4 0 2.4-3.2 0-3.2H13" /><path class="feature-line" d="M4.5 26.6v-6.4l5.4 6.4v-6.4M13.2 20.2l6 6.4M19.2 20.2l-6 6.4" /><path class="accent-line" d="M25.5 24V8M23.3 10.2 25.5 8l2.2 2.2" /></g>
 </svg>

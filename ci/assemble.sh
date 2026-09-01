@@ -32,6 +32,17 @@ API="https://${HOST}/api/v1/repos/${OWNER}/${INSTALLER_REPO}"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
+ASKPASS="$WORK/git-askpass"
+cat >"$ASKPASS" <<'ASKPASS_EOF'
+#!/bin/sh
+case "$1" in
+  *Username*) printf '%s\n' "$OWNER" ;;
+  *)          printf '%s\n' "$PAT" ;;
+esac
+ASKPASS_EOF
+chmod 700 "$ASKPASS"
+export GIT_ASKPASS="$ASKPASS"
+export GIT_TERMINAL_PROMPT=0
 PREVIOUS_REVISIONS="$WORK/previous_plugin_revisions.json"
 printf '{"schema":1,"plugins":{}}\n' > "$PREVIOUS_REVISIONS"
 
@@ -73,7 +84,7 @@ while IFS='|' read -r repo ref; do
   dest="$WORK/$repo"
   # dll/dlx/dat 都是普通 git 对象(非 LFS); 跳过 LFS 平滑, 避免容器无 git-lfs 报错
   GIT_LFS_SKIP_SMUDGE=1 git clone --quiet --depth 100 --branch "$ref" \
-    "https://${PAT}@${HOST}/${OWNER}/${repo}.git" "$dest"
+    "https://${HOST}/${OWNER}/${repo}.git" "$dest"
 
   current_sha=$(git -C "$dest" rev-parse HEAD)
   old_sha=$(jq -r --arg repo "$repo" '.plugins[$repo].sha // empty' "$PREVIOUS_REVISIONS")

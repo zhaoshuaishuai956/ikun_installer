@@ -1,1 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><polygon points="16.00,19.40 1.45,11.00 1.45,14.40 16.00,22.80" fill="#B6A6E0" stroke="#433A5E" stroke-width="1.3" stroke-linejoin="round"/><polygon points="30.55,11.00 16.00,19.40 16.00,22.80 30.55,14.40" fill="#9061F0" stroke="#433A5E" stroke-width="1.3" stroke-linejoin="round"/><polygon points="16.00,2.60 30.55,11.00 16.00,19.40 1.45,11.00" fill="#EDE6FC" stroke="#433A5E" stroke-width="1.3" stroke-linejoin="round"/><path d="M 14.76,6.80 L 14.76,1.60 A 1.24 0.62 0 0 0 17.24,1.60 L 17.24,6.80 A 1.24 0.62 0 0 1 14.76,6.80 Z" fill="#9061F0" stroke="#433A5E" stroke-width="1.20" stroke-linejoin="round"/><ellipse cx="16.00" cy="1.60" rx="1.24" ry="0.62" fill="#C9B6FA" stroke="#433A5E" stroke-width="1.3"/><path d="M 22.04,11.00 L 22.04,5.80 A 1.24 0.62 0 0 0 24.51,5.80 L 24.51,11.00 A 1.24 0.62 0 0 1 22.04,11.00 Z" fill="#9061F0" stroke="#433A5E" stroke-width="1.20" stroke-linejoin="round"/><ellipse cx="23.27" cy="5.80" rx="1.24" ry="0.62" fill="#C9B6FA" stroke="#433A5E" stroke-width="1.3"/><path d="M 7.49,11.00 L 7.49,5.80 A 1.24 0.62 0 0 0 9.96,5.80 L 9.96,11.00 A 1.24 0.62 0 0 1 7.49,11.00 Z" fill="#9061F0" stroke="#433A5E" stroke-width="1.20" stroke-linejoin="round"/><ellipse cx="8.73" cy="5.80" rx="1.24" ry="0.62" fill="#C9B6FA" stroke="#433A5E" stroke-width="1.3"/><path d="M 14.76,15.20 L 14.76,10.00 A 1.24 0.62 0 0 0 17.24,10.00 L 17.24,15.20 A 1.24 0.62 0 0 1 14.76,15.20 Z" fill="#9061F0" stroke="#433A5E" stroke-width="1.20" stroke-linejoin="round"/><ellipse cx="16.00" cy="10.00" rx="1.24" ry="0.62" fill="#C9B6FA" stroke="#433A5E" stroke-width="1.3"/><g transform="translate(16 1.6) rotate(270)"><polygon points="2.73,0.00 -0.74,-2.11 -0.74,-1.05 -2.85,-1.05 -2.85,1.05 -0.74,1.05 -0.74,2.11" fill="#7C57E5"/></g></svg>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <title>ejector-layout</title>
+  <style>
+  .icon { fill: none; stroke: #433A5E; stroke-width: 1.35; stroke-linecap: round; stroke-linejoin: round; }
+  .guide { fill: none; stroke: #B6A6E0; stroke-width: 1.05; stroke-linecap: round; stroke-linejoin: round; }
+  .surface { fill: #EDE6FC; }
+  .side-fill { fill: #B6A6E0; }
+  .feature-fill { fill: #9061F0; }
+  .cap-fill { fill: #C9B6FA; }
+  .hole-fill { fill: #FFFFFF; }
+  .feature-line { stroke: #9061F0; }
+  .accent-line { stroke: #7C57E5; }  </style>
+<g class="icon" xmlns="http://www.w3.org/2000/svg"><path class="surface" d="M4.5 20h23v5.5h-23z" /><path d="M4.5 20 8 17h19.5M27.5 20v5.5" /><ellipse class="cap-fill" cx="9" cy="17" rx="2.4" ry="1.2" /><ellipse class="cap-fill" cx="16" cy="17" rx="2.4" ry="1.2" /><ellipse class="cap-fill" cx="23" cy="17" rx="2.4" ry="1.2" /><path class="feature-line" d="M6.6 17V10M11.4 17V10M13.6 17V7.5M18.4 17V7.5M20.6 17V11.5M25.4 17V11.5" /><path class="accent-line" d="M16 5V2.8M13.7 5.1 16 2.8l2.3 2.3" /></g>
+</svg>

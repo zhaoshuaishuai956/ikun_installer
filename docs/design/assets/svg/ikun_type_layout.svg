@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <title>type-layout</title>
+  <style>
+  .icon { fill: none; stroke: #433A5E; stroke-width: 1.35; stroke-linecap: round; stroke-linejoin: round; }
+  .guide { fill: none; stroke: #B6A6E0; stroke-width: 1.05; stroke-linecap: round; stroke-linejoin: round; }
+  .surface { fill: #EDE6FC; }
+  .side-fill { fill: #B6A6E0; }
+  .feature-fill { fill: #9061F0; }
+  .cap-fill { fill: #C9B6FA; }
+  .hole-fill { fill: #FFFFFF; }
+  .feature-line { stroke: #9061F0; }
+  .accent-line { stroke: #7C57E5; }  </style>
+<g class="icon" xmlns="http://www.w3.org/2000/svg"><rect class="surface" x="3.5" y="4.5" width="7" height="10" rx=".6" /><rect class="surface" x="12.5" y="4.5" width="7" height="10" rx=".6" /><rect class="surface" x="21.5" y="4.5" width="7" height="10" rx=".6" /><rect class="side-fill" x="3.5" y="17.5" width="7" height="10" rx=".6" /><rect class="side-fill" x="12.5" y="17.5" width="7" height="10" rx=".6" /><rect class="side-fill" x="21.5" y="17.5" width="7" height="10" rx=".6" /><path class="feature-line" d="M7 7v5M15 8.5c0-1.8 3-1.8 3 0 0 1.4-3 1.6-3 3.5h3M24 7h2.5L24 12h2.5M6 20v5M5 20h2.2c2.2 0 2.2 2.5 0 2.5H5M5 22.5h2.4c2.4 0 2.4 2.5 0 2.5H5M15 25l1.5-5 1.5 5M15.7 23h1.6M24.5 20v5M23 21.5l1.5-1.5 1.5 1.5" /></g>
+</svg>

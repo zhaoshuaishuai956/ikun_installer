@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-  <title>single-line-text</title>
+  <title>multi-entity-nester</title>
   <style>
   .icon { fill: none; stroke: #433A5E; stroke-width: 1.35; stroke-linecap: round; stroke-linejoin: round; }
   .guide { fill: none; stroke: #B6A6E0; stroke-width: 1.05; stroke-linecap: round; stroke-linejoin: round; }
@@ -11,5 +11,5 @@
   .hole-fill { fill: #FFFFFF; }
   .feature-line { stroke: #9061F0; }
   .accent-line { stroke: #7C57E5; }  </style>
-<g class="icon" xmlns="http://www.w3.org/2000/svg"><path class="feature-line" d="M8 24.5 15.5 6.8 23 24.5M11 18h9" /><path class="accent-line" d="M5 27.5h22" /><path class="guide" d="M5 5.5h4M5 5.5v4" /></g>
+<g class="icon" xmlns="http://www.w3.org/2000/svg"><rect class="surface" x="3.5" y="3.5" width="25" height="25" rx="1.5" /><path class="feature-fill" d="M6.5 6.5h7l2.2 3.7-3.4 4.1H6.5z" /><path class="cap-fill" d="M6.5 17h5.2v3.1h3.4v6H6.5z" /><path class="side-fill" d="M18 6.5c5.2 0 8 2.9 8 7.1 0 2.3-1.1 3.8-3 5.2l3 2.7v4.6h-8v-5.7l2.7-2.2c1.2-1 1.8-2.2 1.8-3.6 0-2.1-1.5-3.5-4.5-3.5z" /></g>
 </svg>

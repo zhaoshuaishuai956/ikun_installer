@@ -3,7 +3,8 @@
 """G5/G7 一致性闸门 (规范 §7.3) — 纯 stdlib, 无第三方依赖。
 
 G5: plugins.json <-> registry/菜单/application 集合一致; BITMAP==ikun_<repo>.bmp;
-    LABEL==plugin.meta.name_cn (字节比较, GBK 解码后); meta 字段白名单 (规范 §4.2/§11.3)
+    LABEL==plugin.meta.name_cn (字节比较, GBK 解码后); meta 字段白名单 (规范 §4.2/§11.3);
+    图标语义表与 plugins.json 集合一致且每个插件恰好一条记录
 G7: 菜单文件 GBK 往返一致 + 无 U+FFFD + 结构合法 (BUTTON 块配对/ACTIONS/BITMAP/LABEL 齐备)
 
 用法: python3 ci/check_consistency.py   (工作目录 = 仓库根)
@@ -22,6 +23,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 APP = os.path.join(ROOT, "DeployResources", "application")
 STARTUP = os.path.join(ROOT, "DeployResources", "startup")
 META_TSV = os.path.join(ROOT, "ci", "_plugin_meta.tsv")
+ICON_SEMANTICS = os.path.join(ROOT, "docs", "design", "plugin-icon-semantics.md")
 fail = False
 
 
@@ -105,6 +107,23 @@ def main():
     with open(os.path.join(ROOT, "plugins.json"), encoding="utf-8") as f:
         plugins = json.load(f)["plugins"]
     repo_set = {p["repo"] for p in plugins}
+
+    # G5g: 语义表是 plugins.json 的派生设计资料，不允许成为漂移的第二份插件名单。
+    if not os.path.exists(ICON_SEMANTICS):
+        err("G5g: 缺少业务插件图标语义表 docs/design/plugin-icon-semantics.md")
+    else:
+        with open(ICON_SEMANTICS, encoding="utf-8") as f:
+            semantics_text = f.read()
+        semantic_ids = re.findall(
+            r"<!--\s*plugin-semantic:([A-Za-z0-9_]+)\s*-->", semantics_text
+        )
+        semantic_set = set(semantic_ids)
+        for repo in sorted({r for r in semantic_ids if semantic_ids.count(r) > 1}):
+            err("G5g: %s 在图标语义表中重复" % repo)
+        for repo in sorted(repo_set - semantic_set):
+            err("G5g: 在册插件 %s 缺少图标语义记录" % repo)
+        for repo in sorted(semantic_set - repo_set):
+            err("G5g: 图标语义表包含未登记插件 %s" % repo)
 
     # meta 摘要 (assemble.sh 生成)
     meta = {}  # repo -> (name_cn, icon_cn, category, in_ikun)

@@ -48,8 +48,20 @@ jobs:
         run: |
           set -e
           rm -rf repo
+          ASKPASS="$(mktemp)"
+          trap 'rm -f "$ASKPASS"' EXIT
+          cat >"$ASKPASS" <<'ASKPASS_EOF'
+          #!/bin/sh
+          case "$1" in
+            *Username*) printf '%s\n' "$GITEA_OWNER" ;;
+            *)          printf '%s\n' "$PAT" ;;
+          esac
+          ASKPASS_EOF
+          chmod 700 "$ASKPASS"
+          export GIT_ASKPASS="$ASKPASS"
+          export GIT_TERMINAL_PROMPT=0
           git clone --quiet --depth 1 --branch master \
-            "https://${PAT}@${GITEA_HOST}/${GITEA_OWNER}/${GITEA_REPO}.git" repo
+            "https://${GITEA_HOST}/${GITEA_OWNER}/${GITEA_REPO}.git" repo
           # G6 secret 扫描需要父提交 (红队批1 P1-3): 补全浅历史
           git -C repo fetch --quiet --unshallow origin || true
 
