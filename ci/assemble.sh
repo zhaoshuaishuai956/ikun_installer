@@ -29,6 +29,8 @@ META_TSV="$SCRIPT_DIR/_plugin_meta.tsv"   # M4/M7b: 供 G5 校验与 gen-icons �
 API="https://${HOST}/api/v1/repos/${OWNER}/${INSTALLER_REPO}"
 
 : "${PAT:?需要 PAT 环境变量(克隆子仓库)}"
+# askpass 作为 git 的子进程运行；派生出的 OWNER 与调用方可能仅为 shell 变量的 PAT 必须显式导出。
+export OWNER PAT
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
