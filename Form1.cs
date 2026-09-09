@@ -286,16 +286,49 @@ public partial class Form1 : Form
             }
 
             Log($"  远端版本: v{remote.Version}  (大小 {(remote.Size / 1024 / 1024.0):F1} MB)", Color.DarkGray);
+            var resourceChanged = false;
+            if (remote.Resources is not null)
+            {
+                Log("  正在检查插件资源差异...", Color.DarkGray);
+                progressBar.Value = 0;
+                var resourceProgress = new Progress<double>(p => progressBar.Value = Math.Min(100, (int)(p * 100)));
+                var resourceResult = await UpdateManager.UpdateResourcesAsync(remote, proxy, resourceProgress);
+                if (!resourceResult.Succeeded)
+                {
+                    if (resourceResult.Error == "找不到已安装的插件部署目录")
+                        Log("  未找到现有插件目录，将继续提供完整安装器更新", Color.DarkOrange);
+                    else if (resourceResult.RequiresElevation && UpdateManager.LaunchElevatedResourceCheck(proxy))
+                    {
+                        Log("  正在请求管理员权限完成插件资源更新...", Color.DarkOrange);
+                        return;
+                    }
+                    else
+                    {
+                        Log($"  插件资源更新失败: {resourceResult.Error}", Color.Red);
+                        MessageBox.Show($"插件资源更新失败:\n{resourceResult.Error}\n\n未完成的文件保持原版本。", "插件更新失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                }
+                resourceChanged = resourceResult.Succeeded && resourceResult.Changed > 0;
+                if (resourceChanged)
+                {
+                    Log($"  已原子更新 {resourceResult.Changed} 项插件资源", Color.Green);
+                    if (resourceResult.NewPlugin)
+                        Log("  检测到新增插件：需重启 NX 后载入菜单", Color.DarkOrange);
+                }
+            }
             if (!Versioning.IsNewer(remote.Version, local))
             {
-                Log($"  已是最新版本 v{local}", Color.Green);
-                MessageBox.Show($"已是最新版本: v{local}", "检查更新", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                Log(resourceChanged ? "  插件资源已更新，安装器本体无需更新" : $"  已是最新版本 v{local}", Color.Green);
+                MessageBox.Show(resourceChanged ? "插件资源已更新，可直接使用。" : $"已是最新版本: v{local}", "检查更新", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
             var ask = MessageBox.Show(
-                $"发现新版本 v{remote.Version} (当前 v{local})\n\n是否立即下载更新?",
-                "发现新版本", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                resourceChanged
+                    ? $"插件资源已更新。安装器本体也有新版本 v{remote.Version}（当前 v{local}）。\n\n是否同时下载完整安装器？"
+                    : $"发现新版本 v{remote.Version} (当前 v{local})\n\n是否立即下载完整安装器?",
+                resourceChanged ? "安装器完整更新" : "发现新版本", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
             if (ask != DialogResult.Yes) { TelemetryClient.QueueEvent("update_offer_closed", "manual", "closed", remote.Version); return; }
 
             // 下载 (进度条复用安装进度条)
@@ -544,6 +577,7 @@ public partial class Form1 : Form
             {
                 using var regKey = Registry.CurrentUser.CreateSubKey(UserRegistryPath);
                 regKey?.SetValue("install_dir", IkToolDir);
+                regKey?.SetValue("active_deploy_root", deploymentRoot, RegistryValueKind.String);
             }
             catch { /* 注册表不可写不阻塞安装 */ }
 

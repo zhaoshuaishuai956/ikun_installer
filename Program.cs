@@ -26,7 +26,7 @@ static class Program
             using var instanceGuard = UpdateCheckInstanceGuard.TryAcquire();
             if (instanceGuard == null) return;
 
-            Application.Run(new UpdateCheckForm(proxyArg));
+            Application.Run(new UpdateCheckForm(proxyArg, args.Contains("--elevated")));
             return;
         }
 

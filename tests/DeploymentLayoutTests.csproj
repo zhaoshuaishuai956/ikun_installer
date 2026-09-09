@@ -13,5 +13,6 @@
     <Compile Include="..\Versioning.cs" Link="src\Versioning.cs" />
     <Compile Include="..\DeploymentLayout.cs" Link="src\DeploymentLayout.cs" />
     <Compile Include="..\UpdateCheckInstanceGuard.cs" Link="src\UpdateCheckInstanceGuard.cs" />
+    <Compile Include="..\ResourceManifest.cs" Link="src\ResourceManifest.cs" />
   </ItemGroup>
 </Project>

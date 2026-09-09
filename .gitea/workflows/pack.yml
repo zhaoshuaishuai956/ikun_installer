@@ -108,11 +108,15 @@ jobs:
             -p:EnableWindowsTargeting=true -p:Version="${VERSION}" -o out
           ls -la out/ikun_installer.exe
 
-      - name: 更新 Gitea Release (只放 exe)
+      - name: 生成插件资源增量包
+        working-directory: repo
+        run: bash ci/make-resource-manifest.sh DeployResources out/resources "${VERSION}"
+
+      - name: 更新 Gitea Release (安装器 exe + 插件资源)
         working-directory: repo
         run: |
           set -e
           export BUILD_TIME="$(date '+%Y-%m-%d %H:%M') CST"
           export VERSION="${VERSION}"
           export PLUGIN_COUNT="$(jq '.plugins | length' plugins.json)"
-          bash ci/publish-release.sh out/ikun_installer.exe
+          bash ci/publish-release.sh out/ikun_installer.exe out/resources/ikun_resources.json out/resources

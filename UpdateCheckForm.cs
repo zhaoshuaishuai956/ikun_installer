@@ -1,20 +1,22 @@
 namespace ikun_installer;
 
 /// <summary>
-///  --check-update 静默检查窗体: NX 侧按钮/启动自动检测调起, 有更新才弹窗。
-///  流程: 检查 -> 无更新静默自动关闭; 有更新弹确认 -> 下载(进度) -> 启动新安装器 -> 关闭。
+///  --check-update 静默检查窗体: NX 侧按钮/启动自动检测调起。
+///  流程: 先按资源清单增量热更新；只有用户选择完整更新安装器时才下载 exe。
 /// </summary>
 public sealed class UpdateCheckForm : Form
 {
     private readonly string? _proxyArg;
+    private readonly bool _elevated;
     private readonly Label _lblStatus = null!;
     private readonly ProgressBar _progress = null!;
     private readonly Button _btnClose = null!;
     private System.Windows.Forms.Timer? _autoClose;
 
-    public UpdateCheckForm(string? proxyArg)
+    public UpdateCheckForm(string? proxyArg, bool elevated = false)
     {
         _proxyArg = proxyArg;
+        _elevated = elevated;
         Text = "爱坤工具箱 - 检查更新";
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -73,10 +75,47 @@ public sealed class UpdateCheckForm : Form
             _btnClose.Enabled = true;
             return;
         }
+        var resourceChanged = false;
+        if (remote.Resources is not null)
+        {
+            _lblStatus.Text = "正在检查插件资源差异...";
+            var resourceProgress = new Progress<double>(p =>
+                _lblStatus.Text = $"正在更新插件资源... {(int)(p * 100)}%" );
+            var resourceResult = await UpdateManager.UpdateResourcesAsync(remote, proxy, resourceProgress);
+            if (!resourceResult.Succeeded)
+            {
+                if (resourceResult.Error == "找不到已安装的插件部署目录")
+                {
+                    _lblStatus.Text = "未找到现有插件目录，将提供完整安装器更新...";
+                }
+                else
+                {
+                if (resourceResult.RequiresElevation && !_elevated && UpdateManager.LaunchElevatedResourceCheck(proxy))
+                {
+                    _lblStatus.Text = "正在请求管理员权限完成插件更新...";
+                    Close();
+                    return;
+                }
+                _lblStatus.Text = $"插件资源更新未完成: {resourceResult.Error}";
+                _btnClose.Enabled = true;
+                return;
+                }
+            }
+            resourceChanged = resourceResult.Succeeded && resourceResult.Changed > 0;
+            if (resourceChanged)
+            {
+                TelemetryClient.QueueEvent("download_completed", "first_plugin_use", "completed", remote.Version);
+                _lblStatus.Text = $"已原子更新 {resourceResult.Changed} 项插件资源";
+                if (resourceResult.NewPlugin)
+                    MessageBox.Show(this, "已有插件已热更新，可直接使用。\n检测到新增插件，需重启 NX 后载入菜单。",
+                        "插件资源更新完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
         if (!Versioning.IsNewer(remote.Version, local))
         {
             TelemetryClient.QueueEvent("update_check", "first_plugin_use", "up_to_date", remote.Version);
-            _lblStatus.Text = $"已是最新版本 (v{local})";
+            _lblStatus.Text = resourceChanged ? "插件资源已更新" : $"已是最新版本 (v{local})";
             _btnClose.Enabled = true;
             _autoClose = new System.Windows.Forms.Timer { Interval = 3000 };
             _autoClose.Tick += (_, _) => Close();
@@ -90,8 +129,10 @@ public sealed class UpdateCheckForm : Form
 
         var ask = MessageBox.Show(
             this,
-            $"发现新版本 {verText} (当前 v{local})\n\n是否立即下载更新?",
-            "发现新版本",
+            resourceChanged
+                ? $"插件资源已更新。安装器本体也有新版本 {verText}（当前 v{local}）。\n\n是否同时下载完整安装器？"
+                : $"发现新版本 {verText} (当前 v{local})\n\n是否立即下载完整安装器?",
+            resourceChanged ? "安装器完整更新" : "发现新版本",
             MessageBoxButtons.YesNo,
             MessageBoxIcon.Information);
         if (ask != DialogResult.Yes) { TelemetryClient.QueueEvent("update_offer_closed", "first_plugin_use", "closed", r.Version); Close(); return; }

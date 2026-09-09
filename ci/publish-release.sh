@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
-#  publish-release.sh — 创建/更新 Gitea Release, 只上传 ikun_installer.exe
-#  用法: publish-release.sh <exe路径>
+#  publish-release.sh — 创建/更新 Gitea Release, 上传安装器和插件资源
+#  用法: publish-release.sh <exe路径> <资源清单> <资源目录>
 #  依赖环境变量: PAT; 可选: GITEA_HOST/OWNER/REPO, RELEASE_TAG, BUILD_TIME
 #  策略: 滚动 tag(默认 latest), 每次删旧 release+标签后在【当前最新提交】重建,
 #        使标签始终指向最新提交(页面不再停在旧提交); 版本号随 run_number 递增。
@@ -9,6 +9,8 @@
 set -euo pipefail
 
 EXE="${1:?用法: publish-release.sh <exe路径>}"
+MANIFEST="${2:?用法: publish-release.sh <exe路径> <资源清单> <资源目录>}"
+RESOURCE_DIR="${3:?用法: publish-release.sh <exe路径> <资源清单> <资源目录>}"
 HOST="${GITEA_HOST:-gt.h.zss.fan:2233}"
 OWNER="${GITEA_OWNER:-zhaoshen}"
 REPO="${GITEA_REPO:-ikun_installer}"
@@ -22,6 +24,8 @@ API="https://${HOST}/api/v1/repos/${OWNER}/${REPO}"
 AUTH="Authorization: token ${PAT}"
 
 [ -f "$EXE" ] || { echo "错误: 找不到 $EXE"; exit 1; }
+[ -f "$MANIFEST" ] || { echo "错误: 找不到资源清单 $MANIFEST"; exit 1; }
+[ -d "$RESOURCE_DIR" ] || { echo "错误: 找不到资源目录 $RESOURCE_DIR"; exit 1; }
 
 title="爱坤工具箱 v${VERSION}"
 
@@ -62,6 +66,7 @@ body="$(cat <<EOF
 - 自动构建于 ${BUILD_TIME}
 - 包含 ${PLUGIN_COUNT} 个插件, 从各子项目最新提交打包
 - 下载 ikun_installer.exe 运行即可 (自包含单文件, 无需 .NET)
+- 插件资源清单: ${RESOURCE_MANIFEST_NAME:-ikun_resources.json}（支持逐项原子热更新）
 - SHA256: ${SHA256}
 
 ## 安装器更新内容
@@ -99,3 +104,18 @@ url=$(curl -sS -X POST -H "$AUTH" \
   "${API}/releases/${rid}/assets?name=${NAME}" | jq -r '.browser_download_url // empty')
 [ -z "$url" ] && { echo "错误: 附件上传失败"; exit 1; }
 echo "完成: ${url}"
+
+upload_asset() {
+  local file="$1" name="$2"
+  echo "上传资源 ${name} ($(du -h "$file" | cut -f1))"
+  curl -sS -X POST -H "$AUTH" -F "attachment=@${file};filename=${name}" \
+    "${API}/releases/${rid}/assets?name=${name}" | jq -e '.browser_download_url != null' >/dev/null
+}
+
+upload_asset "$MANIFEST" "ikun_resources.json"
+while IFS= read -r file; do
+  [ -f "$file" ] || continue
+  name="$(basename "$file")"
+  [ "$name" = "ikun_resources.json" ] && continue
+  upload_asset "$file" "$name"
+done < <(find "$RESOURCE_DIR" -maxdepth 1 -type f -printf '%p\n' | sort)

@@ -12,7 +12,7 @@ NX 插件标准化发布安装器：打包、部署和安装 AiKun Toolbox 集�
 - 每个 NX 会话首次点击任意业务插件时自动检查更新；新增插件仍需重启 NX 以载入菜单
 - 一键发布到分发位置
 - 可选受管遥测：通过一次性注册码登记设备，后台上报更新事件及加密设备快照；未配置注册码时完全停用，不影响主流程
-- 遥测后台：动森风格只读监看页 `https://td.h.zss.fan:2233/dashboard`，独立服务端口
+- 遥测后台：动森风格只读监看页 `https://td.h.zss.fan:2233`，独立服务端口
 
 ## Why — 为什么
 
@@ -29,6 +29,7 @@ NX 插件标准化发布安装器：打包、部署和安装 AiKun Toolbox 集�
 ## Run — 如何运行
 
 1. 从本仓库 **Releases → latest** 下载 `ikun_installer.exe` 运行安装（日常唯一通道，见「自动打包」节）
+   NX 内“检查更新”会先读取资源清单，只下载变化的 DLL/DLX/DAT、菜单和图标并逐项原子替换；安装器本体完整更新仍可随后选择，或直接重新运行完整安装器。
 2. 本地调试安装器：先 `pwsh scripts/dev-assemble.ps1 -ReposRoot <插件克隆根目录>` 重建部署资源，再
    `dotnet run --project ikun_installer.csproj`（出真包用 CI；旧 `build.ps1`/`update.ps1` 已按规范 M6 移除）
 
@@ -71,7 +72,7 @@ dotnet build ikun_installer.csproj -c Release
 
 子项目更新后**自动**在 Gitea 主机 rock5t 上打包并更新 Release，无需本机操作。
 
-**触发链**：改插件源码 → push 子项目（dll/dlx/dat 变更）→ 子项目 `notify-installer.yml`（权威模板见 `docs/templates/`）调 API 触发本仓库 `pack.yml` → rock5t 的 act_runner 在 `dotnet/sdk:9.0` 容器里：读 `plugins.json` → clone 各子项目收集资源 → 闸门 G1–G8（规范 §7.3）→ 交叉编译 win-x64 单文件 exe（`EnableWindowsTargeting=true`）→ 更新 Release `latest`（只放 exe）。
+**触发链**：改插件源码 → push 子项目（dll/dlx/dat 变更）→ 子项目 `notify-installer.yml`（权威模板见 `docs/templates/`）调 API 触发本仓库 `pack.yml` → rock5t 的 act_runner 在 `dotnet/sdk:9.0` 容器里：读 `plugins.json` → clone 各子项目收集资源 → 闸门 G1–G8（规范 §7.3）→ 交叉编译 win-x64 单文件 exe（`EnableWindowsTargeting=true`）→ 更新 Release `latest`（包含完整安装器 exe、资源清单和逐项插件资源）。
 
 **取用**：从本仓库 **Releases → latest** 下载 `ikun_installer.exe` 运行安装。
 

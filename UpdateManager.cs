@@ -25,7 +25,10 @@ public static class UpdateManager
     public const string AssetName = "ikun_installer.exe";
 
     /// <summary>远端 release 信息</summary>
-    public sealed record RemoteRelease(Version Version, string DownloadUrl, long Size, string? Sha256);
+    public sealed record RemoteRelease(Version Version, string DownloadUrl, long Size, string? Sha256,
+        ResourceManifest? Resources = null);
+
+    public const string ResourceManifestAssetName = "ikun_resources.json";
 
     // === 版本 ===
     // 版本解析/比较/哈希提取纯逻辑集中在 Versioning (M9: 可在 CI 容器测试);
@@ -139,7 +142,33 @@ public static class UpdateManager
             if (ver == null) return null;
             // 下载地址必须 https, 防 Gitea 响应被控后指向明文 http + MITM (security MEDIUM)
             if (!asset.BrowserDownloadUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) return null;
-            return new RemoteRelease(ver, asset.BrowserDownloadUrl, asset.Size, Versioning.ExtractSha256(rel.Body));
+            ResourceManifest? manifest = null;
+            var manifestAsset = rel.Assets?.FirstOrDefault(a =>
+                string.Equals(a.Name, ResourceManifestAssetName, StringComparison.OrdinalIgnoreCase));
+            if (manifestAsset?.BrowserDownloadUrl is { Length: > 0 } manifestUrl &&
+                manifestUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                using var manifestResponse = await client.GetAsync(manifestUrl, ct);
+                if (manifestResponse.IsSuccessStatusCode && (manifestResponse.Content.Headers.ContentLength ?? 0) <= 10 * 1024 * 1024)
+                {
+                    var parsed = ResourceManifest.Parse(await manifestResponse.Content.ReadAsByteArrayAsync(ct));
+                    if (parsed is not null && Version.TryParse(parsed.ReleaseVersion, out var manifestVersion) && manifestVersion == ver)
+                    {
+                        var assetsByName = (rel.Assets ?? []).Where(a => !string.IsNullOrWhiteSpace(a.Name) &&
+                            !string.IsNullOrWhiteSpace(a.BrowserDownloadUrl)).ToDictionary(a => a.Name!, StringComparer.OrdinalIgnoreCase);
+                        var resolved = parsed.Resources.Select(entry =>
+                        {
+                            if (!assetsByName.TryGetValue(entry.Asset, out var resourceAsset) ||
+                                resourceAsset.BrowserDownloadUrl is not { Length: > 0 } url ||
+                                !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) return null;
+                            return entry with { Asset = url };
+                        }).ToList();
+                        if (resolved.All(x => x is not null))
+                            manifest = parsed with { Resources = resolved! };
+                    }
+                }
+            }
+            return new RemoteRelease(ver, asset.BrowserDownloadUrl, asset.Size, Versioning.ExtractSha256(rel.Body), manifest);
         }
         catch { return null; }
     }
@@ -288,6 +317,127 @@ public static class UpdateManager
             return temp;
         }
         catch { return null; }
+    }
+
+    /// <summary>
+    /// 下载并原子替换 Release 清单中发生变化的插件资源，不下载完整安装器。
+    /// 所有资源先落到用户临时目录并校验，之后逐项替换；失败时回滚已替换文件。
+    /// </summary>
+    public static async Task<ResourceUpdateResult> UpdateResourcesAsync(RemoteRelease remote, string? proxy,
+        IProgress<double>? progress = null, CancellationToken ct = default)
+    {
+        if (remote.Resources is null) return new(0, 0, false, "远端没有插件资源清单");
+        var root = ResolveActiveDeploymentRoot();
+        if (root is null) return new(0, 0, false, "找不到已安装的插件部署目录");
+        var resources = remote.Resources.Resources;
+        var staged = new List<(ResourceEntry Entry, string TempPath, string TargetPath, bool IsNew)>();
+        var changed = 0;
+        var skipped = 0;
+        var newPlugin = false;
+        var stageRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ikun_tools", "resource-updates", Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(stageRoot);
+            using var client = CreateClient(proxy);
+            for (var i = 0; i < resources.Count; i++)
+            {
+                ct.ThrowIfCancellationRequested();
+                var entry = resources[i];
+                var target = Path.Combine(root, entry.RelativePath.Replace('/', Path.DirectorySeparatorChar));
+                if (!IsUnderRoot(root, target)) return new(0, skipped, false, "资源路径越界");
+                if (File.Exists(target) && await HashMatchesAsync(target, entry.Sha256, ct)) { skipped++; continue; }
+                var temp = Path.Combine(stageRoot, $"{i:D4}.tmp");
+                using var response = await client.GetAsync(entry.Asset, HttpCompletionOption.ResponseHeadersRead, ct);
+                if (!response.IsSuccessStatusCode) return new(0, skipped, false, $"资源下载失败: {entry.RelativePath}");
+                var length = response.Content.Headers.ContentLength;
+                if (length is not null && length.Value != entry.Size) return new(0, skipped, false, $"资源大小校验失败: {entry.RelativePath}");
+                await using (var output = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None, 64 * 1024, true))
+                await using (var input = await response.Content.ReadAsStreamAsync(ct))
+                {
+                    await input.CopyToAsync(output, ct);
+                }
+                if (new FileInfo(temp).Length != entry.Size || !await HashMatchesAsync(temp, entry.Sha256, ct))
+                    return new(0, skipped, false, $"资源完整性校验失败: {entry.RelativePath}");
+                var isNew = entry.RelativePath.StartsWith("application/", StringComparison.OrdinalIgnoreCase) && !File.Exists(target) &&
+                    !string.Equals(Path.GetFileName(entry.RelativePath), "ikun_updater.dll", StringComparison.OrdinalIgnoreCase);
+                newPlugin |= isNew;
+                staged.Add((entry, temp, target, isNew));
+                changed++;
+                progress?.Report((double)(i + 1) / resources.Count);
+            }
+
+            var backups = new List<(string Target, byte[]? Old, bool Existed)>();
+            try
+            {
+                foreach (var item in staged)
+                {
+                    var existed = File.Exists(item.TargetPath);
+                    backups.Add((item.TargetPath, existed ? await File.ReadAllBytesAsync(item.TargetPath, ct) : null, existed));
+                    DeploymentLayout.WriteFileAtomic(item.TargetPath, await File.ReadAllBytesAsync(item.TempPath, ct));
+                }
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return new(0, skipped, false, "需要管理员权限写入插件部署目录", true);
+            }
+            catch (Exception ex)
+            {
+                foreach (var backup in backups.AsEnumerable().Reverse())
+                {
+                    try
+                    {
+                        if (backup.Existed && backup.Old is not null) DeploymentLayout.WriteFileAtomic(backup.Target, backup.Old);
+                        else if (File.Exists(backup.Target)) File.Delete(backup.Target);
+                    }
+                    catch { }
+                }
+                return new(0, skipped, false, $"资源替换失败，已回滚: {ex.Message}");
+            }
+            return new(changed, skipped, newPlugin, null);
+        }
+        catch (OperationCanceledException) { return new(0, skipped, false, "更新已取消"); }
+        catch (Exception ex) { return new(0, skipped, false, ex.Message); }
+        finally
+        {
+            try { if (Directory.Exists(stageRoot)) Directory.Delete(stageRoot, true); } catch { }
+        }
+    }
+
+    private static async Task<bool> HashMatchesAsync(string path, string expected, CancellationToken ct)
+    {
+        await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 64 * 1024, true);
+        var hash = await SHA256.HashDataAsync(stream, ct);
+        return Convert.ToHexString(hash).Equals(expected, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? ResolveActiveDeploymentRoot()
+    {
+        var configured = AppConfig.GetString("active_deploy_root", "");
+        if (Directory.Exists(configured)) return Path.GetFullPath(configured);
+        var deployments = Path.Combine(AppConfig.InstallDir, "deployments");
+        return Directory.Exists(deployments)
+            ? Directory.EnumerateDirectories(deployments).OrderByDescending(Directory.GetLastWriteTimeUtc).FirstOrDefault()
+            : null;
+    }
+
+    private static bool IsUnderRoot(string root, string candidate)
+    {
+        var normalizedRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        return Path.GetFullPath(candidate).StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>仅在资源确实需要写入且当前进程权限不足时，以 UAC 重启一次检查流程。</summary>
+    public static bool LaunchElevatedResourceCheck(string? proxy)
+    {
+        try
+        {
+            var self = Environment.ProcessPath;
+            if (string.IsNullOrWhiteSpace(self) || !File.Exists(self)) return false;
+            var args = "--check-update --elevated" + (string.IsNullOrWhiteSpace(proxy) ? "" : $" --proxy \"{proxy.Replace("\"", "") }\"");
+            Process.Start(new ProcessStartInfo(self, args) { UseShellExecute = true, Verb = "runas" });
+            return true;
+        }
+        catch { return false; }
     }
 
     /// <summary>

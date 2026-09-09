@@ -41,6 +41,13 @@ Require(Versioning.ExtractSha256("- SHA256: abc") == null, "短哈希必须拒�
 
 Console.WriteLine("versioning contract tests: PASS");
 
+// ============ 插件资源清单安全测试 ============
+var manifestJson = System.Text.Encoding.UTF8.GetBytes("{\"schema\":1,\"release_version\":\"2.1.0.1\",\"resources\":[{\"relative_path\":\"application/demo.dll\",\"asset\":\"ikun_resource_application__demo.dll\",\"size\":1,\"sha256\":\"" + new string('a', 64) + "\"}]}");
+Require(ResourceManifest.Parse(manifestJson) is not null, "合法资源清单解析失败");
+var unsafeManifest = System.Text.Encoding.UTF8.GetBytes("{\"schema\":1,\"release_version\":\"2.1.0.1\",\"resources\":[{\"relative_path\":\"../evil.dll\",\"asset\":\"evil\",\"size\":1,\"sha256\":\"" + new string('a', 64) + "\"}]}");
+Require(ResourceManifest.Parse(unsafeManifest) is null, "资源路径穿越未被拒绝");
+Console.WriteLine("resource manifest safety tests: PASS");
+
 // ============ 更新检查单实例测试 ============
 var updateMutexName = $"ikun-update-check-test-{Guid.NewGuid():N}";
 using (var firstCheck = UpdateCheckInstanceGuard.TryAcquire(updateMutexName))
