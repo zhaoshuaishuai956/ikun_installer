@@ -10,7 +10,8 @@
     <ApplicationIcon>ikun-tools.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>ikun_installer</AssemblyName>
-    <Version>2.1.0</Version>
+    <!-- 测试增量更新基线：高于现有 2.1.0.* 安装器，便于验证版本检测与资源更新 -->
+    <Version>2.1.1</Version>
     <!-- 自包含发布 + 只保留中文语言资源 -->
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
