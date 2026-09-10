@@ -112,10 +112,11 @@ public sealed class UpdateCheckForm : Form
             }
         }
 
-        if (!Versioning.IsNewer(remote.Version, local))
+        var installerUpdateAvailable = UpdateManager.IsInstallerUpdateAvailable(remote, local);
+        if (!installerUpdateAvailable)
         {
             TelemetryClient.QueueEvent("update_check", "first_plugin_use", "up_to_date", remote.Version);
-            _lblStatus.Text = resourceChanged ? "插件资源已更新" : $"已是最新版本 (v{local})";
+            _lblStatus.Text = resourceChanged ? "插件资源已更新" : $"插件资源与安装器均为最新 (v{local})";
             _btnClose.Enabled = true;
             _autoClose = new System.Windows.Forms.Timer { Interval = 3000 };
             _autoClose.Tick += (_, _) => Close();
@@ -125,23 +126,23 @@ public sealed class UpdateCheckForm : Form
 
         // 拷贝非空引用: lambda 捕获与 await 会使 nullable 流分析失效, 统一用非空变量
         UpdateManager.RemoteRelease r = remote!;
-        var verText = $"v{r.Version}";
+        var installerVerText = $"v{(r.InstallerVersion ?? r.Version)}";
 
         var ask = MessageBox.Show(
             this,
             resourceChanged
-                ? $"插件资源已更新。安装器本体也有新版本 {verText}（当前 v{local}）。\n\n是否同时下载完整安装器？"
-                : $"发现新版本 {verText} (当前 v{local})\n\n是否立即下载完整安装器?",
+                ? $"插件资源已更新。安装器本体有新版本 {installerVerText}（当前 v{local}）。\n\n是否同时下载完整安装器？"
+                : $"发现安装器新版本 {installerVerText} (当前 v{local})\n\n是否立即下载完整安装器?",
             resourceChanged ? "安装器完整更新" : "发现新版本",
             MessageBoxButtons.YesNo,
             MessageBoxIcon.Information);
         if (ask != DialogResult.Yes) { TelemetryClient.QueueEvent("update_offer_closed", "first_plugin_use", "closed", r.Version); Close(); return; }
 
-        _lblStatus.Text = $"正在下载 {verText} ...";
+        _lblStatus.Text = $"正在下载完整安装器 {installerVerText} ...";
         var progress = new Progress<double>(p =>
         {
             _progress.Value = (int)(p * 100);
-            _lblStatus.Text = $"正在下载 {verText} ... {_progress.Value}%";
+            _lblStatus.Text = $"正在下载完整安装器 {installerVerText} ... {_progress.Value}%";
         });
         var path = await UpdateManager.DownloadAsync(r, proxy, progress);
         TelemetryClient.QueueEvent(path is null ? "download_failed" : "download_completed", "first_plugin_use", path is null ? "failed" : "completed", r.Version);
@@ -154,7 +155,7 @@ public sealed class UpdateCheckForm : Form
 
         var ok = MessageBox.Show(
             this,
-            $"新版本 {verText} 已下载完成.\n\n是否立即启动更新安装?",
+            $"安装器 {installerVerText} 已下载完成.\n\n是否立即启动更新安装?",
             "下载完成",
             MessageBoxButtons.YesNo,
             MessageBoxIcon.Question);

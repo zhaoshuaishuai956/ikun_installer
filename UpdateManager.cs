@@ -12,8 +12,9 @@ namespace ikun_installer;
 /// <summary>
 ///  更新管理: Gitea latest release 版本对比 / 代理配置 / 下载
 ///  设计(第一性原理):
-///   - 远端版本 = Gitea 滚动 release(latest tag) 的 name 中提取的 x.y.z(.w)
-///   - 本地版本 = 程序集 FileVersion(CI 以 -p:Version=2.1.0.<run> 注入)
+///   - 资源版本 = Gitea 滚动 release(latest tag) 的 name 中提取的 x.y.z(.w)
+///   - 安装器版本 = 资源清单 installer_version；旧清单缺失时回退资源版本
+///   - 本地版本 = 程序集 FileVersion(CI 以 -p:Version 注入)
 ///   - 代理 = HKCU\Software\ikun_tools\proxy (可空=直连); 默认见 AppConfig
 ///   - 下载目标文件名固定, 内容来自 Gitea 附件(https + 系统证书校验)
 ///   - M9/M10: 强类型 JSON 解析 + 锚点版本正则 + Release 正文 sha256 第二道完整性校验
@@ -26,7 +27,7 @@ public static class UpdateManager
 
     /// <summary>远端 release 信息</summary>
     public sealed record RemoteRelease(Version Version, string DownloadUrl, long Size, string? Sha256,
-        ResourceManifest? Resources = null);
+        ResourceManifest? Resources = null, Version? InstallerVersion = null);
 
     public const string ResourceManifestAssetName = "ikun_resources.json";
 
@@ -168,7 +169,10 @@ public static class UpdateManager
                     }
                 }
             }
-            return new RemoteRelease(ver, asset.BrowserDownloadUrl, asset.Size, Versioning.ExtractSha256(rel.Body), manifest);
+            Version? installerVersion = null;
+            if (manifest?.InstallerVersion is { } installerText && Version.TryParse(installerText, out var parsedInstallerVersion))
+                installerVersion = parsedInstallerVersion;
+            return new RemoteRelease(ver, asset.BrowserDownloadUrl, asset.Size, Versioning.ExtractSha256(rel.Body), manifest, installerVersion);
         }
         catch { return null; }
     }
@@ -255,7 +259,7 @@ public static class UpdateManager
         var cur = local ?? Versioning.GetLocalVersion();
         var remote = await FetchRemoteAsync(proxy, ct);
         if (remote == null) return null;
-        return Versioning.IsNewer(remote.Version, cur) ? remote : null;
+        return IsInstallerUpdateAvailable(remote, cur) ? remote : null;
     }
 
     // === 下载 ===
@@ -318,6 +322,13 @@ public static class UpdateManager
         }
         catch { return null; }
     }
+
+    /// <summary>
+    /// 只判断安装器本体是否需要下载。插件资源版本递增不再隐式触发完整安装器更新。
+    /// 没有新版清单时回退旧行为，兼容历史 Release。
+    /// </summary>
+    public static bool IsInstallerUpdateAvailable(RemoteRelease remote, Version local)
+        => Versioning.IsNewer(remote.InstallerVersion ?? remote.Version, local);
 
     /// <summary>
     /// 下载并原子替换 Release 清单中发生变化的插件资源，不下载完整安装器。

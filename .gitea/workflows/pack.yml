@@ -15,6 +15,7 @@ on:
       - DeploymentLayout.cs
       - UpdateManager.cs
       - UpdateCheckForm.cs
+      - ResourceManifest.cs
       - plugins.json
       - CHANGELOG.md
       - ci/**
@@ -76,9 +77,38 @@ jobs:
           echo "VERSION=${BASE}.${BUILD}" >> "$GITHUB_ENV"
           echo "版本: ${BASE}.${BUILD}"
 
+      - name: 分类本次发布变更
+        working-directory: repo
+        run: |
+          set -e
+          previous_commit=""
+          previous_installer_version=""
+          if previous_json=$(curl --fail --silent --show-error --max-time 20 \
+              -H "Authorization: token ${PAT}" \
+              "https://${GITEA_HOST}/api/v1/repos/${GITEA_OWNER}/${GITEA_REPO}/releases/tags/${RELEASE_TAG}" 2>/dev/null); then
+            previous_commit=$(printf '%s' "$previous_json" | jq -r '.target_commitish // empty')
+            previous_body=$(printf '%s' "$previous_json" | jq -r '.body // ""')
+            previous_installer_version=$(printf '%s' "$previous_body" | \
+              grep -oE '<!-- ikun-installer-version:[0-9]+(\.[0-9]+){2,3} -->' | \
+              tail -1 | grep -oE '[0-9]+(\.[0-9]+){2,3}' || true)
+            if [ -z "$previous_installer_version" ]; then
+              previous_name=$(printf '%s' "$previous_json" | jq -r '.name // ""')
+              previous_installer_version=$(printf '%s' "$previous_name" | \
+                grep -oE '[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?' | tail -1 || true)
+            fi
+          fi
+          if ! [[ "$previous_commit" =~ ^[0-9a-fA-F]{7,64}$ ]]; then previous_commit=""; fi
+          classification=$(bash ci/classify-update.sh "$previous_commit" "$VERSION" "$previous_installer_version")
+          printf '%s\n' "$classification" | tee /tmp/ikun-update-classification.env
+          cat /tmp/ikun-update-classification.env >> "$GITHUB_ENV"
+
       - name: 回归测试子插件更新记录
         working-directory: repo
         run: bash ci/test-release-notes.sh
+
+      - name: 回归测试更新分类
+        working-directory: repo
+        run: bash ci/test-update-classification.sh
 
       - name: "纯逻辑测试 (M9 版本契约/部署槽)"
         working-directory: repo
@@ -110,7 +140,7 @@ jobs:
 
       - name: 生成插件资源增量包
         working-directory: repo
-        run: bash ci/make-resource-manifest.sh DeployResources out/resources "${VERSION}"
+        run: bash ci/make-resource-manifest.sh DeployResources out/resources "${VERSION}" "${INSTALLER_VERSION}" "${UPDATE_KIND}"
 
       - name: 更新 Gitea Release (安装器 exe + 插件资源)
         working-directory: repo

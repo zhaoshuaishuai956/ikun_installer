@@ -276,7 +276,7 @@ public partial class Form1 : Form
             Log($"  本地版本: v{local}  代理: {(proxy ?? "(直连)")}", Color.DarkGray);
 
             var remote = await UpdateManager.FetchRemoteAsync(proxy);
-            TelemetryClient.QueueEvent("update_check", "manual", remote is null ? "failed" : Versioning.IsNewer(remote.Version, local) ? "update_available" : "up_to_date", remote?.Version);
+            TelemetryClient.QueueEvent("update_check", "manual", remote is null ? "failed" : UpdateManager.IsInstallerUpdateAvailable(remote, local) ? "update_available" : "up_to_date", remote?.Version);
             if (remote == null)
             {
                 Log("  检查失败: 无法连接 Gitea 或解析版本信息", Color.Red);
@@ -317,17 +317,19 @@ public partial class Form1 : Form
                         Log("  检测到新增插件：需重启 NX 后载入菜单", Color.DarkOrange);
                 }
             }
-            if (!Versioning.IsNewer(remote.Version, local))
+            var installerUpdateAvailable = UpdateManager.IsInstallerUpdateAvailable(remote, local);
+            if (!installerUpdateAvailable)
             {
-                Log(resourceChanged ? "  插件资源已更新，安装器本体无需更新" : $"  已是最新版本 v{local}", Color.Green);
-                MessageBox.Show(resourceChanged ? "插件资源已更新，可直接使用。" : $"已是最新版本: v{local}", "检查更新", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                Log(resourceChanged ? "  插件资源已更新，安装器本体无需更新" : $"  插件资源与安装器均为最新 v{local}", Color.Green);
+                MessageBox.Show(resourceChanged ? "插件资源已更新，可直接使用。" : $"插件资源与安装器均为最新: v{local}", "检查更新", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
+            var installerVersion = remote.InstallerVersion ?? remote.Version;
             var ask = MessageBox.Show(
                 resourceChanged
-                    ? $"插件资源已更新。安装器本体也有新版本 v{remote.Version}（当前 v{local}）。\n\n是否同时下载完整安装器？"
-                    : $"发现新版本 v{remote.Version} (当前 v{local})\n\n是否立即下载完整安装器?",
+                    ? $"插件资源已更新。安装器本体有新版本 v{installerVersion}（当前 v{local}）。\n\n是否同时下载完整安装器？"
+                    : $"发现安装器新版本 v{installerVersion} (当前 v{local})\n\n是否立即下载完整安装器?",
                 resourceChanged ? "安装器完整更新" : "发现新版本", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
             if (ask != DialogResult.Yes) { TelemetryClient.QueueEvent("update_offer_closed", "manual", "closed", remote.Version); return; }
 

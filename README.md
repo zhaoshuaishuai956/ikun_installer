@@ -29,7 +29,7 @@ NX 插件标准化发布安装器：打包、部署和安装 AiKun Toolbox 集�
 ## Run — 如何运行
 
 1. 从本仓库 **Releases → latest** 下载 `ikun_installer.exe` 运行安装（日常唯一通道，见「自动打包」节）
-   NX 内“检查更新”会先读取资源清单，只下载变化的 DLL/DLX/DAT、菜单和图标并逐项原子替换；安装器本体完整更新仍可随后选择，或直接重新运行完整安装器。
+   NX 内“检查更新”会先读取资源清单，只下载变化的 DLL/DLX/DAT、菜单和图标并逐项原子替换；Release 同时携带“更新分类”和独立的安装器本体版本，只有安装器运行时代码变化才提示下载完整安装器。
 2. 本地调试安装器：先 `pwsh scripts/dev-assemble.ps1 -ReposRoot <插件克隆根目录>` 重建部署资源，再
    `dotnet run --project ikun_installer.csproj`（出真包用 CI；旧 `build.ps1`/`update.ps1` 已按规范 M6 移除）
 
@@ -61,6 +61,7 @@ dotnet build ikun_installer.csproj -c Release
 | `plugins.json` | 自动打包的子项目清单（repo+ref；图标取自各仓 plugin.meta） |
 | `scripts/dev-assemble.ps1` | 本地重建 `DeployResources/application`（规范 M5） |
 | `ci/assemble.sh` | CI：收集各子项目部署资源 + meta 摘要 + G1/G4/G8 |
+| `ci/classify-update.sh` | CI：按上次 Release 提交范围区分插件资源更新与安装器本体更新 |
 | `ci/gates.sh` | CI：闸门 G2/G3/G6 |
 | `ci/check_consistency.py` | CI：闸门 G5/G7 一致性校验 |
 | `ci/release-notes.sh` | CI：按上次 Release 基线提取子插件增量更新 |

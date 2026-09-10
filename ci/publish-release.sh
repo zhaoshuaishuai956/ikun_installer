@@ -19,6 +19,8 @@ NAME="ikun_installer.exe"
 : "${PAT:?需要 PAT}"
 BUILD_TIME="${BUILD_TIME:-auto}"
 VERSION="${VERSION:-0.0.0}"
+INSTALLER_VERSION="${INSTALLER_VERSION:-$VERSION}"
+UPDATE_KIND="${UPDATE_KIND:-installer}"
 PLUGIN_COUNT="${PLUGIN_COUNT:-?}"
 API="https://${HOST}/api/v1/repos/${OWNER}/${REPO}"
 AUTH="Authorization: token ${PAT}"
@@ -67,6 +69,7 @@ body="$(cat <<EOF
 - 包含 ${PLUGIN_COUNT} 个插件, 从各子项目最新提交打包
 - 下载 ikun_installer.exe 运行即可 (自包含单文件, 无需 .NET)
 - 插件资源清单: ${RESOURCE_MANIFEST_NAME:-ikun_resources.json}（支持逐项原子热更新）
+- 本次更新分类: ${UPDATE_KIND}（安装器本体版本 ${INSTALLER_VERSION}）
 - SHA256: ${SHA256}
 
 ## 安装器更新内容
@@ -78,6 +81,7 @@ ${INSTALLER_CHANGES}
 ${PLUGIN_CHANGES}
 
 ${REVISION_MARKER}
+<!-- ikun-installer-version:${INSTALLER_VERSION} -->
 EOF
 )"
 
