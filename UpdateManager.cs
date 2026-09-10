@@ -345,6 +345,7 @@ public static class UpdateManager
         var changed = 0;
         var skipped = 0;
         var newPlugin = false;
+        var details = new List<ResourceUpdateDetail>();
         var stageRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ikun_tools", "resource-updates", Guid.NewGuid().ToString("N"));
         try
         {
@@ -373,6 +374,12 @@ public static class UpdateManager
                     !string.Equals(Path.GetFileName(entry.RelativePath), "ikun_updater.dll", StringComparison.OrdinalIgnoreCase);
                 newPlugin |= isNew;
                 staged.Add((entry, temp, target, isNew));
+                var pluginId = string.IsNullOrWhiteSpace(entry.PluginId)
+                    ? Path.GetFileNameWithoutExtension(entry.RelativePath)
+                    : entry.PluginId;
+                var pluginName = string.IsNullOrWhiteSpace(entry.PluginName) ? pluginId : entry.PluginName;
+                var description = string.IsNullOrWhiteSpace(entry.Description) ? "部署资源更新" : entry.Description;
+                details.Add(new ResourceUpdateDetail(pluginId!, pluginName!, entry.RelativePath, description!, isNew));
                 changed++;
                 progress?.Report((double)(i + 1) / resources.Count);
             }
@@ -404,7 +411,7 @@ public static class UpdateManager
                 }
                 return new(0, skipped, false, $"资源替换失败，已回滚: {ex.Message}");
             }
-            return new(changed, skipped, newPlugin, null);
+            return new(changed, skipped, newPlugin, null, false, details);
         }
         catch (OperationCanceledException) { return new(0, skipped, false, "更新已取消"); }
         catch (Exception ex) { return new(0, skipped, false, ex.Message); }

@@ -156,6 +156,8 @@ CI 按 `plugins.json` 克隆、收集和校验插件，生成单文件安装器�
 
 Release 资源清单必须同时记录 `release_version`（本次资源包版本）、`installer_version`（安装器本体版本）和 `update_kind`（`plugins` 或 `installer`）。仅子插件、菜单、图标或插件清单变化时，`installer_version` 沿用上一次安装器本体版本；安装器运行时代码、项目依赖或内嵌安装器资源变化时才提升该字段。
 
+每个资源条目还必须带 `plugin_id`、`plugin_name` 和 `description`。`description` 来源于子项目 CHANGELOG 的用户可理解条目；缺失时使用“插件资源更新”兜底。NX 与安装器在原子替换成功后必须按插件分组展示这些说明，不能只显示更新文件数量。
+
 ### 9.2 热更新语义
 
 - 首次安装：创建并注册一个活动部署目录。

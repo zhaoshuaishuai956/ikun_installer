@@ -287,6 +287,8 @@ public partial class Form1 : Form
 
             Log($"  远端版本: v{remote.Version}  (大小 {(remote.Size / 1024 / 1024.0):F1} MB)", Color.DarkGray);
             var resourceChanged = false;
+            var resourceRequiresRestart = false;
+            var resourceSummary = "";
             if (remote.Resources is not null)
             {
                 Log("  正在检查插件资源差异...", Color.DarkGray);
@@ -312,23 +314,26 @@ public partial class Form1 : Form
                 resourceChanged = resourceResult.Succeeded && resourceResult.Changed > 0;
                 if (resourceChanged)
                 {
+                    resourceRequiresRestart = resourceResult.NewPlugin;
                     Log($"  已原子更新 {resourceResult.Changed} 项插件资源", Color.Green);
-                    if (resourceResult.NewPlugin)
-                        Log("  检测到新增插件：需重启 NX 后载入菜单", Color.DarkOrange);
+                    resourceSummary = ResourceUpdateDescription.Format(resourceResult.Details);
+                    foreach (var line in resourceSummary.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries))
+                        Log($"    {line}", Color.DarkGreen);
                 }
             }
             var installerUpdateAvailable = UpdateManager.IsInstallerUpdateAvailable(remote, local);
             if (!installerUpdateAvailable)
             {
                 Log(resourceChanged ? "  插件资源已更新，安装器本体无需更新" : $"  插件资源与安装器均为最新 v{local}", Color.Green);
-                MessageBox.Show(resourceChanged ? "插件资源已更新，可直接使用。" : $"插件资源与安装器均为最新: v{local}", "检查更新", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                var restartNote = resourceRequiresRestart ? "新增插件需重启 NX。" : "已有插件可直接使用，无需重启 NX。";
+                MessageBox.Show(resourceChanged ? $"插件资源已更新，可直接使用。\n\n更新内容：\n{resourceSummary}\n\n{restartNote}" : $"插件资源与安装器均为最新: v{local}", "检查更新", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
             var installerVersion = remote.InstallerVersion ?? remote.Version;
             var ask = MessageBox.Show(
                 resourceChanged
-                    ? $"插件资源已更新。安装器本体有新版本 v{installerVersion}（当前 v{local}）。\n\n是否同时下载完整安装器？"
+                    ? $"插件资源已更新：\n{resourceSummary}\n\n安装器本体有新版本 v{installerVersion}（当前 v{local}）。\n\n是否同时下载完整安装器？"
                     : $"发现安装器新版本 v{installerVersion} (当前 v{local})\n\n是否立即下载完整安装器?",
                 resourceChanged ? "安装器完整更新" : "发现新版本", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
             if (ask != DialogResult.Yes) { TelemetryClient.QueueEvent("update_offer_closed", "manual", "closed", remote.Version); return; }

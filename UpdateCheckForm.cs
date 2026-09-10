@@ -76,6 +76,9 @@ public sealed class UpdateCheckForm : Form
             return;
         }
         var resourceChanged = false;
+        var resourceChangedCount = 0;
+        var resourceRequiresRestart = false;
+        var resourceSummary = "";
         if (remote.Resources is not null)
         {
             _lblStatus.Text = "正在检查插件资源差异...";
@@ -90,25 +93,25 @@ public sealed class UpdateCheckForm : Form
                 }
                 else
                 {
-                if (resourceResult.RequiresElevation && !_elevated && UpdateManager.LaunchElevatedResourceCheck(proxy))
-                {
-                    _lblStatus.Text = "正在请求管理员权限完成插件更新...";
-                    Close();
+                    if (resourceResult.RequiresElevation && !_elevated && UpdateManager.LaunchElevatedResourceCheck(proxy))
+                    {
+                        _lblStatus.Text = "正在请求管理员权限完成插件更新...";
+                        Close();
+                        return;
+                    }
+                    _lblStatus.Text = $"插件资源更新未完成: {resourceResult.Error}";
+                    _btnClose.Enabled = true;
                     return;
-                }
-                _lblStatus.Text = $"插件资源更新未完成: {resourceResult.Error}";
-                _btnClose.Enabled = true;
-                return;
                 }
             }
             resourceChanged = resourceResult.Succeeded && resourceResult.Changed > 0;
             if (resourceChanged)
             {
+                resourceChangedCount = resourceResult.Changed;
+                resourceRequiresRestart = resourceResult.NewPlugin;
+                resourceSummary = ResourceUpdateDescription.Format(resourceResult.Details);
                 TelemetryClient.QueueEvent("download_completed", "first_plugin_use", "completed", remote.Version);
                 _lblStatus.Text = $"已原子更新 {resourceResult.Changed} 项插件资源";
-                if (resourceResult.NewPlugin)
-                    MessageBox.Show(this, "已有插件已热更新，可直接使用。\n检测到新增插件，需重启 NX 后载入菜单。",
-                        "插件资源更新完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 
@@ -117,6 +120,9 @@ public sealed class UpdateCheckForm : Form
         {
             TelemetryClient.QueueEvent("update_check", "first_plugin_use", "up_to_date", remote.Version);
             _lblStatus.Text = resourceChanged ? "插件资源已更新" : $"插件资源与安装器均为最新 (v{local})";
+            if (resourceChanged)
+                MessageBox.Show(this, $"已原子更新 {resourceChangedCount} 项插件资源。\n\n更新内容：\n{resourceSummary}\n\n{(resourceRequiresRestart ? "新增插件需重启 NX。" : "已有插件可直接使用，无需重启 NX。")}",
+                    "插件资源更新完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
             _btnClose.Enabled = true;
             _autoClose = new System.Windows.Forms.Timer { Interval = 3000 };
             _autoClose.Tick += (_, _) => Close();
@@ -131,7 +137,7 @@ public sealed class UpdateCheckForm : Form
         var ask = MessageBox.Show(
             this,
             resourceChanged
-                ? $"插件资源已更新。安装器本体有新版本 {installerVerText}（当前 v{local}）。\n\n是否同时下载完整安装器？"
+                ? $"插件资源已更新：\n{resourceSummary}\n\n安装器本体有新版本 {installerVerText}（当前 v{local}）。\n\n是否同时下载完整安装器？"
                 : $"发现安装器新版本 {installerVerText} (当前 v{local})\n\n是否立即下载完整安装器?",
             resourceChanged ? "安装器完整更新" : "发现新版本",
             MessageBoxButtons.YesNo,

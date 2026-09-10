@@ -86,7 +86,7 @@ dotnet build ikun_installer.csproj -c Release
 
 **额外资源**（不止 dll/dlx）：在子项目根放 `ikun-deploy.txt`，每行一个 glob（如 `*.dll`/`*.dlx`/`*.dat`/`*.cfg`）；缺省为 `*.dll *.dlx *.dat`。文件扁平部署到 `application/`。
 
-**更新记录**：Release 正文内嵌上次实际打包的子项目提交清单。下次构建只展示清单之后新增的 `CHANGELOG.md` 条目（包括 `Unreleased`）；未维护 CHANGELOG 时回退到提交标题。每个插件最多展示 8 条，未变化的插件不重复列出。
+**更新记录**：Release 正文内嵌上次实际打包的子项目提交清单；资源清单还会记录每个资源对应的插件中文名和功能说明。下次构建只展示清单之后新增的 `CHANGELOG.md` 条目（包括 `Unreleased`）；未维护 CHANGELOG 时回退到提交标题。每个插件最多展示 8 条，未变化的插件不重复列出。NX 原子更新完成后会按插件分组显示具体更新内容。
 
 **手动触发**：本仓库 Actions 页运行 `pack-installer`，或 `POST /api/v1/repos/zhaoshen/ikun_installer/actions/workflows/pack.yml/dispatches`。
 

@@ -50,6 +50,15 @@ var unsafeManifest = System.Text.Encoding.UTF8.GetBytes("{\"schema\":1,\"release
 Require(ResourceManifest.Parse(unsafeManifest) is null, "资源路径穿越未被拒绝");
 var invalidKind = System.Text.Encoding.UTF8.GetBytes("{\"schema\":1,\"release_version\":\"2.1.0.1\",\"installer_version\":\"2.1.0.0\",\"update_kind\":\"all\",\"resources\":[{\"relative_path\":\"application/demo.dll\",\"asset\":\"demo\",\"size\":1,\"sha256\":\"" + new string('a', 64) + "\"}]}");
 Require(ResourceManifest.Parse(invalidKind) is null, "未知更新分类必须拒绝");
+var updateDetails = new[]
+{
+    new ResourceUpdateDetail("text_auto_layout", "文字排版", "application/text_auto_layout.dll", "修复文字曲线预览", false),
+    new ResourceUpdateDetail("text_auto_layout", "文字排版", "application/text_auto_layout.dlx", "修复文字曲线预览", false),
+    new ResourceUpdateDetail("new_plugin", "新功能插件", "application/new_plugin.dll", "新增参数化功能", true)
+};
+var updateSummary = ResourceUpdateDescription.Format(updateDetails);
+Require(updateSummary.Contains("文字排版：修复文字曲线预览") && updateSummary.Contains("新功能插件：新增参数化功能"),
+    "原子更新说明未包含插件和功能");
 Console.WriteLine("resource manifest safety tests: PASS");
 
 // ============ 更新检查单实例测试 ============
