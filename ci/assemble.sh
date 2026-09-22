@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 #  assemble.sh — 从 plugins.json 列出的子项目仓库收集部署资源
+#  [2026-09-22] 迁移至 GitHub: Gitea API -> GitHub API (api.github.com/repos, 克隆走 github.com)
 #  运行环境: mcr.microsoft.com/dotnet/sdk:9.0 容器 (git/curl/jq 可用)
 #  依赖环境变量: PAT (克隆私有子仓库用的 token)
 #  产物: 重建 DeployResources/application/ (扁平放置各插件的部署文件)
@@ -18,15 +19,17 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=release-notes.sh
 source "$SCRIPT_DIR/release-notes.sh"
 
-HOST="${GITEA_HOST:-gt.h.zss.fan:2233}"
-OWNER="${GITEA_OWNER:-zhaoshen}"
+# ---- 迁移后 (GitHub): 主机/API 基址可覆盖, 默认 GitHub ----
+GIT_HOST="${GIT_HOST:-github.com}"
+API_BASE="${API_BASE:-https://api.github.com}"
+OWNER="${GIT_OWNER:-${GITHUB_REPOSITORY_OWNER:-zhaoshen}}"
 INSTALLER_REPO="${GITEA_REPO:-ikun_installer}"
 RELEASE_TAG="${RELEASE_TAG:-latest}"
 APP_DIR="DeployResources/application"
 CHANGES_FILE="$SCRIPT_DIR/_plugin_changes.md"
 REVISIONS_FILE="$SCRIPT_DIR/_plugin_revisions.json"
 META_TSV="$SCRIPT_DIR/_plugin_meta.tsv"   # M4/M7b: 供 G5 校验与 gen-icons 消费 (pack.yml 步骤间 handoff)
-API="https://${HOST}/api/v1/repos/${OWNER}/${INSTALLER_REPO}"
+API="${API_BASE}/repos/${OWNER}/${INSTALLER_REPO}"
 
 : "${PAT:?需要 PAT 环境变量(克隆子仓库)}"
 # askpass 作为 git 的子进程运行；派生出的 OWNER 与调用方可能仅为 shell 变量的 PAT 必须显式导出。
@@ -86,7 +89,7 @@ while IFS='|' read -r repo ref; do
   dest="$WORK/$repo"
   # dll/dlx/dat 都是普通 git 对象(非 LFS); 跳过 LFS 平滑, 避免容器无 git-lfs 报错
   GIT_LFS_SKIP_SMUDGE=1 git clone --quiet --depth 100 --branch "$ref" \
-    "https://${HOST}/${OWNER}/${repo}.git" "$dest"
+    "https://${GIT_HOST}/${OWNER}/${repo}.git" "$dest"
 
   current_sha=$(git -C "$dest" rev-parse HEAD)
   old_sha=$(jq -r --arg repo "$repo" '.plugins[$repo].sha // empty' "$PREVIOUS_REVISIONS")
@@ -203,7 +206,7 @@ while IFS='|' read -r repo ref; do
     # 开 Issue 一律开在安装器仓 (规范 G4: 避免 CI token 需要各插件仓写权限, 与 M11 最小权限一致)
     issue_title="[G4] ${repo} 制品更新缺 CHANGELOG 条目"
     if ! curl --fail --silent --show-error --max-time 20 -H "Authorization: token ${PAT}" \
-        "${API}/issues?state=open&limit=50" 2>/dev/null | grep -qF "$issue_title"; then
+        "${API}/issues?state=open&per_page=100" 2>/dev/null | grep -qF "$issue_title"; then
       curl --fail --silent --show-error --max-time 20 -X POST -H "Authorization: token ${PAT}" \
         -H "Content-Type: application/json" \
         -d "$(jq -n --arg t "$issue_title" --arg b "打包时发现 ${repo} 制品(dll/dlx/dat)已更新但 CHANGELOG.md 无新增条目（规范 §6.4 gate G4 阶段一）。请在变更提交中补充用户可感知的变更说明，否则阶段二将打包失败。" '{title:$t, body:$b}')" \

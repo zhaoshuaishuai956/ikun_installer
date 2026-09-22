@@ -1,3 +1,5 @@
+# 权威模板 (GitHub Actions) — [2026-09-22] 由 Gitea Actions 迁移
+# 用法: 复制到 <repo>/.github/workflows/ 下; 唯一定制项见文件内注释
 name: check-sync
 # M14: 源码已更新但制品(dll)未重建的同步检查 (规范 §14 M14 / 绕过路径4)
 # 触发: push 含源码扩展名时, 比对已提交 dll 内嵌构建 SHA 与 HEAD; 不匹配 → 工作流标红
@@ -11,13 +13,17 @@ on:
       - '**.py'
 jobs:
   check:
-    runs-on: dotnet
+    runs-on: ubuntu-latest
     steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: 安装 strings 工具
         run: |
           set -e
           if ! command -v strings >/dev/null; then
-            apt-get update -qq && apt-get install -y -qq binutils >/dev/null
+            sudo apt-get update -qq && sudo apt-get install -y -qq binutils >/dev/null
           fi
       - name: 比对 dll 内嵌构建 SHA 与 HEAD
         run: |
@@ -36,3 +42,4 @@ jobs:
           done
           [ "$stale" -eq 0 ] && echo "制品与源码同步 OK"
           exit "$stale"
+

@@ -23,28 +23,32 @@ $CloneRoot = Join-Path ([IO.Path]::GetTempPath()) "ikun-assemble-$RunId"
 $MetaTemp = "$MetaTsv.stage-$RunId"
 $MetaBackup = "$MetaTsv.backup-$RunId"
 
-function Invoke-GiteaClone {
+function Invoke-RemoteClone {
   param(
     [Parameter(Mandatory = $true)][string]$Repo,
     [Parameter(Mandatory = $true)][string]$Ref,
     [Parameter(Mandatory = $true)][string]$Destination
   )
 
-  if (-not $env:GITEA_HOST -or -not $env:GITEA_USER -or -not $env:GITEA_TOKEN) {
-    throw "远程克隆需要 GITEA_HOST、GITEA_USER、GITEA_TOKEN 环境变量"
+  # [2026-09-22] 迁移至 GitHub: 优先 GIT_HOST/GIT_USER/GIT_TOKEN, 回退旧 GITEA_* 变量
+  $gitHost  = if ($env:GIT_HOST)  { $env:GIT_HOST }  else { $env:GITEA_HOST }
+  $gitUser  = if ($env:GIT_USER)  { $env:GIT_USER }  else { $env:GITEA_USER }
+  $gitToken = if ($env:GIT_TOKEN) { $env:GIT_TOKEN } else { $env:GITEA_TOKEN }
+  if (-not $gitHost -or -not $gitUser -or -not $gitToken) {
+    throw "远程克隆需要 GIT_HOST、GIT_USER、GIT_TOKEN 环境变量 (旧名 GITEA_HOST/GITEA_USER/GITEA_TOKEN 亦可)"
   }
 
-  $hostNoProto = $env:GITEA_HOST -replace '^https?://', ''
-  $scheme = if ($env:GITEA_HOST -match '^http://') { 'http' } else { 'https' }
+  $hostNoProto = $gitHost -replace '^https?://', ''
+  $scheme = if ($gitHost -match '^http://') { 'http' } else { 'https' }
   $cloneUrl = "${scheme}://${hostNoProto}/$($env:GITEA_USER)/${Repo}.git"
   $askPass = Join-Path ([IO.Path]::GetTempPath()) ("ikun-git-askpass-" + [guid]::NewGuid().ToString("N") + ".cmd")
   $askPassBody = @'
 @echo off
 echo %~1 | %SystemRoot%\System32\findstr.exe /I "Username" >nul
 if not errorlevel 1 (
-  echo %GITEA_USER%
+  echo %GIT_USER%
 ) else (
-  echo %GITEA_TOKEN%
+  echo %GIT_TOKEN%
 )
 '@
 
@@ -52,6 +56,8 @@ if not errorlevel 1 (
   $oldTerminalPrompt = $env:GIT_TERMINAL_PROMPT
   try {
     [IO.File]::WriteAllText($askPass, $askPassBody, [Text.Encoding]::ASCII)
+    $env:GIT_USER = $gitUser
+    $env:GIT_TOKEN = $gitToken
     $env:GIT_ASKPASS = $askPass
     $env:GIT_TERMINAL_PROMPT = "0"
     # URL 与 askpass 文件均不含 Token；临时脚本只从当前进程环境读取凭证。
@@ -82,7 +88,7 @@ try {
     if ($UseRemote -or -not (Test-Path $src)) {
       $src = Join-Path $CloneRoot $repo
       # 规范 §11.6: 不用 sslVerify=false — 本机需已信任自签 CA (更新链同样要求, 见 §9.3.5)
-      Invoke-GiteaClone -Repo $repo -Ref $ref -Destination $src
+      Invoke-RemoteClone -Repo $repo -Ref $ref -Destination $src
     }
     if (-not (Test-Path $src)) { throw "找不到 $repo 源目录: $src" }
 
