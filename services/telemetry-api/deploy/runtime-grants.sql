@@ -9,6 +9,6 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA telemetry TO ikun_telemetry_runti
 REVOKE DELETE, TRUNCATE, REFERENCES, TRIGGER ON telemetry.enrollment_tokens, telemetry.devices, telemetry.device_snapshots, telemetry.device_macs, telemetry.events, telemetry.security_blocks FROM ikun_telemetry_runtime;
 -- Verify separately: pg_roles must show rolsuper=false, rolcreatedb=false, rolcreaterole=false.
 -- SET ROLE ikun_telemetry_runtime; CREATE TABLE telemetry.must_fail(id int); RESET ROLE;
--- Do not grant access to Gitea schemas/databases.
+-- Do not grant access to GitHub schemas/databases.
 -- Apply migrations with a separate migration role, never with runtime.
 -- Passwords are injected outside this file.

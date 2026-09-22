@@ -279,8 +279,8 @@ public partial class Form1 : Form
             TelemetryClient.QueueEvent("update_check", "manual", remote is null ? "failed" : UpdateManager.IsInstallerUpdateAvailable(remote, local) ? "update_available" : "up_to_date", remote?.Version);
             if (remote == null)
             {
-                Log("  检查失败: 无法连接 Gitea 或解析版本信息", Color.Red);
-                MessageBox.Show("检查更新失败:\n无法连接 Gitea 或解析版本信息。\n请检查网络与代理地址。",
+                Log("  检查失败: 无法连接 GitHub 或解析版本信息", Color.Red);
+                MessageBox.Show("检查更新失败:\n无法连接 GitHub 或解析版本信息。\n请检查网络与代理地址。",
                     "检查失败", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }

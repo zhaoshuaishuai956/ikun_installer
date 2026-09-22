@@ -31,16 +31,16 @@ function Invoke-RemoteClone {
   )
 
   # [2026-09-22] 迁移至 GitHub: 优先 GIT_HOST/GIT_USER/GIT_TOKEN, 回退旧 GITEA_* 变量
-  $gitHost  = if ($env:GIT_HOST)  { $env:GIT_HOST }  else { $env:GITEA_HOST }
-  $gitUser  = if ($env:GIT_USER)  { $env:GIT_USER }  else { $env:GITEA_USER }
-  $gitToken = if ($env:GIT_TOKEN) { $env:GIT_TOKEN } else { $env:GITEA_TOKEN }
+  $gitHost  = if ($env:GIT_HOST)  { $env:GIT_HOST }  else { $env:GIT_HOST }
+  $gitUser  = if ($env:GIT_USER)  { $env:GIT_USER }  else { $env:GIT_USER }
+  $gitToken = if ($env:GIT_TOKEN) { $env:GIT_TOKEN } else { $env:GIT_TOKEN }
   if (-not $gitHost -or -not $gitUser -or -not $gitToken) {
-    throw "远程克隆需要 GIT_HOST、GIT_USER、GIT_TOKEN 环境变量 (旧名 GITEA_HOST/GITEA_USER/GITEA_TOKEN 亦可)"
+    throw "远程克隆需要 GIT_HOST、GIT_USER、GIT_TOKEN 环境变量 (旧名 GIT_HOST/GIT_USER/GIT_TOKEN 亦可)"
   }
 
   $hostNoProto = $gitHost -replace '^https?://', ''
   $scheme = if ($gitHost -match '^http://') { 'http' } else { 'https' }
-  $cloneUrl = "${scheme}://${hostNoProto}/$($env:GITEA_USER)/${Repo}.git"
+  $cloneUrl = "${scheme}://${hostNoProto}/$($env:GIT_USER)/${Repo}.git"
   $askPass = Join-Path ([IO.Path]::GetTempPath()) ("ikun-git-askpass-" + [guid]::NewGuid().ToString("N") + ".cmd")
   $askPassBody = @'
 @echo off

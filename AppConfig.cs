@@ -43,9 +43,9 @@ public static class AppConfig
     }
 
     /// <summary>latest release API (默认 GitHub 公共仓库地址; 可覆盖)。</summary>
-    /// <remarks>[2026-09-22] 从自托管 Gitea (gt.h.zss.fan:2233, 已停用) 迁移至 GitHub。</remarks>
-    public static string GiteaLatestApi => GetString("gitea_api",
-        "https://api.github.com/repos/zhaoshen/ikun_installer/releases/tags/latest");
+    /// <remarks>[2026-09-22] 从GitHub (github.com, 已停用) 迁移至 GitHub。</remarks>
+    public static string LatestReleaseApi => GetString("release_api",
+        "https://api.github.com/repos/zhaoshuaishuai956/ikun_installer/releases/tags/latest");
 
     /// <summary>默认更新代理 (可覆盖; 空=直连)。</summary>
     public static string DefaultProxy => GetString("default_proxy", "192.168.1.5:6666");

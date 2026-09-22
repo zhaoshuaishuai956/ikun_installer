@@ -1,4 +1,4 @@
-﻿# Gitea Workflow — AI Agent 系统指令
+﻿# Git Workflow — AI Agent 系统指令
 
 本文件是通用 Markdown 格式的可执行系统指令，适用于所有主流 AI 编程助手。不含占位符，每个指令须被无条件执行。
 
@@ -34,7 +34,7 @@ cp AGENTS.md ~/your-project/.github/copilot-instructions.md  # GitHub Copilot
 
 在执行 commit 时，按以下优先级确定 `Co-Authored-By` 签名：
 
-1. 环境变量 `GITEA_COAUTHOR` 已设置 → 直接使用
+1. 环境变量 `GIT_COAUTHOR` 已设置 → 直接使用
 2. `$CLAUDE_CODE_SESSION_ID` 存在 → `Claude Code <noreply@anthropic.com>`
 3. `.cursorrules` 或 `.cursor/` 目录存在 → `Cursor AI <noreply@cursor.com>`
 4. `.github/copilot-instructions.md` 存在 → `GitHub Copilot <noreply@github.com>`
@@ -42,7 +42,7 @@ cp AGENTS.md ~/your-project/.github/copilot-instructions.md  # GitHub Copilot
 6. `.windsurfrules` 存在 → `Windsurf AI <noreply@windsurf.com>`
 7. 均不匹配 → `AI Assistant <assistant@ai.tool>`
 
-用户可通过 `export GITEA_COAUTHOR="My Tool <tool@example.com>"` 覆盖。
+用户可通过 `export GIT_COAUTHOR="My Tool <tool@example.com>"` 覆盖。
 
 ### 设备名检测
 
@@ -56,29 +56,31 @@ hostname
 $env:COMPUTERNAME
 ```
 
-若无法获取，默认为 `unknown-device`。用户可通过 `export GITEA_DEVICE="my-machine"` 手动设置。
+若无法获取，默认为 `unknown-device`。用户可通过 `export GIT_DEVICE="my-machine"` 手动设置。
 
 ---
 
 ## 1. Configuration
 
-从以下来源读取 Gitea 凭证（优先级从高到低）：
-1. 环境变量：`GITEA_HOST`、`GITEA_TOKEN`、`GITEA_USER`
+从以下来源读取 Git 凭证（优先级从高到低）：
+1. 环境变量：`GIT_HOST`、`GIT_TOKEN`、`GIT_USER`
 2. Agent 持久化存储（Claude Code: memory 系统；Cursor: Cursor Settings；Copilot: VS Code settings；其他: 环境变量或 `.env`）
 3. 项目 `.env` 文件（如存在且不在 git 追踪中）
 
-`GITEA_HOST` 格式约定：
-- API 调用用完整 URL：`https://git.example.com`（含协议）
-- Git remote URL 只用 host:port：`git.example.com`（不含协议）
-- 若 `GITEA_HOST` 含协议前缀，构造 git URL 时须剥离。
+`GIT_HOST` 格式约定：
+- 默认 `github.com`（GitHub.com）；自建 GitHub Enterprise 填自己的域名
+- Git remote URL 只用 host：`github.com`（不含协议）
+- 若 `GIT_HOST` 含协议前缀，构造 git URL 时须剥离
+- **API 基址与 git host 不同**：GitHub.com 的 REST API 在 `https://api.github.com`，
+  故单独用 `GIT_API` 表示（自建 GHE 覆盖为 `https://<host>/api/v3`）
 
-### Bootstrap：当 GITEA_TOKEN 未设置
+### Bootstrap：当 GIT_TOKEN 未设置
 
 执行以下检测序列：
 ```bash
-echo $GITEA_TOKEN
+echo $GIT_TOKEN
 ```
-- 若为空：**停止**。提示用户提供 Gitea 访问令牌，告知生成路径：`https://${GITEA_HOST}/user/settings/applications`
+- 若为空：**停止**。提示用户提供 GitHub 访问令牌，告知生成路径：`https://https://github.com/settings/tokens`
 - 将用户提供的 Token 存入当前 Agent 的持久化存储（不要写入任何文件）。若 Agent 无持久化存储能力，引导用户设置环境变量。
 - 验证 Token 有效性后继续
 
@@ -86,12 +88,12 @@ echo $GITEA_TOKEN
 
 ```bash
 curl -sS -o /dev/null -w "%{http_code}" \
-  "https://${GITEA_HOST}/api/v1/user" \
-  -H "Authorization: token ${GITEA_TOKEN}"
+  "https://${GIT_HOST}/user" \
+  -H "Authorization: Bearer ${GIT_TOKEN}"
 ```
 - 200 → 有效，继续
 - 401 → Token 过期/无效，提示用户重新生成
-- 其他 → 检查网络和 `GITEA_HOST`
+- 其他 → 检查网络和 `GIT_HOST`
 
 ---
 
@@ -102,7 +104,7 @@ curl -sS -o /dev/null -w "%{http_code}" \
 git remote -v
 ```
 - 无 remote → 执行「新项目」流程
-- 有 remote 且指向 Gitea → 执行「已有项目」流程
+- 有 remote 且指向 GitHub → 执行「已有项目」流程
 - 有 remote 但指向其他平台 → 询问用户是否迁移
 
 ---
@@ -119,16 +121,16 @@ git status 2>&1
 
 # 3. 仓库是否已存在？
 curl -sS -o /dev/null -w "%{http_code}" \
-  "https://${GITEA_HOST}/api/v1/repos/${GITEA_USER}/${REPO_NAME}" \
-  -H "Authorization: token ${GITEA_TOKEN}"
+  "https://${GIT_HOST}/repos/${GIT_USER}/${REPO_NAME}" \
+  -H "Authorization: Bearer ${GIT_TOKEN}"
 # 404 → 不存在，可以创建
 # 200 → 已存在，直接设置 remote 即可
 ```
 
 ### 3.2 创建仓库
 ```bash
-curl -sS -X POST "https://${GITEA_HOST}/api/v1/user/repos" \
-  -H "Authorization: token ${GITEA_TOKEN}" \
+curl -sS -X POST "https://${GIT_HOST}/user/repos" \
+  -H "Authorization: Bearer ${GIT_TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{"name":"<repo>","description":"<desc>","private":true,"has_issues":true,"has_wiki":false,"has_projects":true,"has_pull_requests":true,"default_branch":"master"}'
 
@@ -166,12 +168,14 @@ git add .gitattributes
 git commit -m "chore(lfs): configure Git LFS tracking"
 ```
 
-**注意**：Gitea 实例必须启用 Git LFS（默认启用）。若服务器不支持，将大文件排除在 `.gitignore` 中。
+**注意**：GitHub 单文件硬上限 **100 MB**（超过直接拒绝 push）。GitHub 免费账号含
+Git LFS 1 GB 存储 + 1 GB/月流量，**超过 100 MB 的二进制/模型/媒体必须走 LFS**
+（`git lfs track`）或排除在 `.gitignore` 中。GitHub 版文档「LFS 无限制」的假设在 GitHub 不成立。
 
 ### 3.5 设置 Remote 并推送
 ```bash
-# GITEA_HOST_NO_PROTO = GITEA_HOST 去掉 https:// 前缀
-git remote add origin "https://${GITEA_USER}:${GITEA_TOKEN}@${GITEA_HOST_NO_PROTO}/${GITEA_USER}/${REPO_NAME}.git"
+# GIT_HOST_NO_PROTO = GIT_HOST 去掉 https:// 前缀
+git remote add origin "https://${GIT_USER}:${GIT_TOKEN}@${GIT_HOST_NO_PROTO}/${GIT_USER}/${REPO_NAME}.git"
 git push -u origin $(git symbolic-ref --short HEAD)
 
 # 验证推送成功
@@ -292,8 +296,8 @@ git ls-remote --heads origin | grep $(git branch --show-current)
 PUSH FAILED
 ├── "fatal: Authentication failed" / HTTP 401
 │   → Token 无效或过期
-│   → curl -sS "https://${GITEA_HOST}/api/v1/user" -H "Authorization: token ${GITEA_TOKEN}"
-│   → 若 401：提示用户到 ${GITEA_HOST}/user/settings/applications 重新生成
+│   → curl -sS "https://${GIT_HOST}/user" -H "Authorization: Bearer ${GIT_TOKEN}"
+│   → 若 401：提示用户到 https://github.com/settings/tokens 重新生成
 │   → 不要用相同凭证重试
 │
 ├── "remote: Not Found" / HTTP 404
@@ -307,12 +311,12 @@ PUSH FAILED
 │   → 无冲突？→ git push
 │
 ├── "Connection timed out" / "Could not resolve host"
-│   → curl -sS --max-time 10 "https://${GITEA_HOST}/api/v1/version"
+│   → curl -sS --max-time 10 "https://${GIT_HOST}/rate_limit"
 │   → 若超时：检查 VPN、防火墙；等待 5s 重试
 │   → 3 次重试后仍失败 → 报告用户，附诊断信息
 │
 ├── "RPC failed; HTTP 413" / "larger than allowed"
-│   → 文件超过 Gitea 允许大小
+│   → 文件超过 GitHub 允许大小
 │   → 确认文件类型是否适合 Git LFS（见 Section 3.4）
 │   → 适合 LFS：git lfs install && git lfs track "<pattern>" && git add .gitattributes
 │   → 不适合 LFS（代码文件异常大）：检查是否误提交了构建产物或数据集
@@ -349,7 +353,7 @@ PUSH FAILED
 
 | 禁止行为 | 后果 |
 |----------|------|
-| 将 GITEA_TOKEN 写入任何文件 | Token 泄露到 git 历史 |
+| 将 GIT_TOKEN 写入任何文件 | Token 泄露到 git 历史 |
 | `git push --force` 未经用户明确批准 | 覆盖远程提交，数据丢失 |
 | `git add -A` 未先验证 .gitignore | 可能暂存密钥文件 |
 | `git commit --no-verify` 跳过检查 | 绕过 pre-commit hooks |
@@ -362,14 +366,14 @@ PUSH FAILED
 
 ```bash
 # 创建 Issue
-curl -sS -X POST "https://${GITEA_HOST}/api/v1/repos/${OWNER}/${REPO}/issues" \
-  -H "Authorization: token ${GITEA_TOKEN}" \
+curl -sS -X POST "https://${GIT_HOST}/repos/${OWNER}/${REPO}/issues" \
+  -H "Authorization: Bearer ${GIT_TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{"title":"<title>","body":"<markdown body>"}'
 
 # 创建 PR
-curl -sS -X POST "https://${GITEA_HOST}/api/v1/repos/${OWNER}/${REPO}/pulls" \
-  -H "Authorization: token ${GITEA_TOKEN}" \
+curl -sS -X POST "https://${GIT_HOST}/repos/${OWNER}/${REPO}/pulls" \
+  -H "Authorization: Bearer ${GIT_TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{"title":"<title>","body":"<body>","head":"<source_branch>","base":"<target_branch>"}'
 ```
@@ -378,7 +382,7 @@ curl -sS -X POST "https://${GITEA_HOST}/api/v1/repos/${OWNER}/${REPO}/pulls" \
 
 ## 10. 通用开发规范
 
-除了 Gitea 工作流，本指令文件要求遵循 AI Agent 通用开发规范。
+除了 Git Workflow，本指令文件要求遵循 AI Agent 通用开发规范。
 完整规范见 `docs/dev-standards.md`，以下为强制要点：
 
 ### 10.1 项目结构与命名

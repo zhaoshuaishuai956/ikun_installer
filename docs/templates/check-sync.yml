@@ -1,4 +1,4 @@
-# 权威模板 (GitHub Actions) — [2026-09-22] 由 Gitea Actions 迁移
+# 权威模板 (GitHub Actions) — [2026-09-22] 由 GitHub Actions 迁移
 # 用法: 复制到 <repo>/.github/workflows/ 下; 唯一定制项见文件内注释
 name: check-sync
 # M14: 源码已更新但制品(dll)未重建的同步检查 (规范 §14 M14 / 绕过路径4)

@@ -10,13 +10,13 @@ using Microsoft.Win32;
 namespace ikun_installer;
 
 /// <summary>
-///  更新管理: Gitea latest release 版本对比 / 代理配置 / 下载
+///  更新管理: GitHub latest release 版本对比 / 代理配置 / 下载
 ///  设计(第一性原理):
-///   - 资源版本 = Gitea 滚动 release(latest tag) 的 name 中提取的 x.y.z(.w)
+///   - 资源版本 = GitHub 滚动 release(latest tag) 的 name 中提取的 x.y.z(.w)
 ///   - 安装器版本 = 资源清单 installer_version；旧清单缺失时回退资源版本
 ///   - 本地版本 = 程序集 FileVersion(CI 以 -p:Version 注入)
 ///   - 代理 = HKCU\Software\ikun_tools\proxy (可空=直连); 默认见 AppConfig
-///   - 下载目标文件名固定, 内容来自 Gitea 附件(https + 系统证书校验)
+///   - 下载目标文件名固定, 内容来自 GitHub 附件(https + 系统证书校验)
 ///   - M9/M10: 强类型 JSON 解析 + 锚点版本正则 + Release 正文 sha256 第二道完整性校验
 /// </summary>
 public static class UpdateManager
@@ -96,16 +96,16 @@ public static class UpdateManager
         return c;
     }
 
-    // === Gitea 响应强类型 DTO (M9: 替代脆弱正则 JSON 解析) ===
+    // === GitHub 响应强类型 DTO (M9: 替代脆弱正则 JSON 解析) ===
 
-    private sealed class GiteaReleaseDto
+    private sealed class GitHubReleaseDto
     {
         public string? Name { get; set; }
         public string? Body { get; set; }
-        public List<GiteaAssetDto>? Assets { get; set; }
+        public List<GitHubAssetDto>? Assets { get; set; }
     }
 
-    private sealed class GiteaAssetDto
+    private sealed class GitHubAssetDto
     {
         public string? Name { get; set; }
         public long Size { get; set; }
@@ -121,7 +121,7 @@ public static class UpdateManager
     // === 检查 ===
 
     /// <summary>
-    ///  查询 Gitea latest release 并解析版本/附件地址/正文 sha256。
+    ///  查询 GitHub latest release 并解析版本/附件地址/正文 sha256。
     ///  返回 null 表示: 网络失败 / 解析失败 / 无附件(视为"无法检查", 不误报有更新)。
     /// </summary>
     public static async Task<RemoteRelease?> FetchRemoteAsync(string? proxy, CancellationToken ct = default)
@@ -129,11 +129,11 @@ public static class UpdateManager
         try
         {
             using var client = CreateClient(proxy);
-            using var resp = await client.GetAsync(AppConfig.GiteaLatestApi, ct);
+            using var resp = await client.GetAsync(AppConfig.LatestReleaseApi, ct);
             if (!resp.IsSuccessStatusCode) return null;
             var json = await resp.Content.ReadAsStringAsync(ct);
 
-            var rel = JsonSerializer.Deserialize<GiteaReleaseDto>(json, JsonOpts);
+            var rel = JsonSerializer.Deserialize<GitHubReleaseDto>(json, JsonOpts);
             if (rel?.Name == null) return null;
             var asset = rel.Assets?.FirstOrDefault(a =>
                 string.Equals(a.Name, AssetName, StringComparison.OrdinalIgnoreCase));
@@ -141,7 +141,7 @@ public static class UpdateManager
 
             var ver = Versioning.ParseRemoteVersion(rel.Name);
             if (ver == null) return null;
-            // 下载地址必须 https, 防 Gitea 响应被控后指向明文 http + MITM (security MEDIUM)
+            // 下载地址必须 https, 防 GitHub 响应被控后指向明文 http + MITM (security MEDIUM)
             if (!asset.BrowserDownloadUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) return null;
             ResourceManifest? manifest = null;
             var manifestAsset = rel.Assets?.FirstOrDefault(a =>
@@ -225,7 +225,7 @@ public static class UpdateManager
     ///  下载后信任校验: ①size 已比对 ②FileVersion 必须等于远端版本(防损坏/错文件)
     ///  ③sha256 存在则必须匹配 (M10) ④有 Authenticode 签名则必须有效。
     ///  信任链权衡(对抗性审查记录):
-    ///   - 过渡期 (M13 代码签名落地前): 无签名构建放行 — 信任边界为「Gitea 服务器 + TLS」,
+    ///   - 过渡期 (M13 代码签名落地前): 无签名构建放行 — 信任边界为「GitHub 服务器 + TLS」,
     ///     sha256 为 TLS 之外的第二道完整性校验 (红队批2 P0-1: 无签名+sha256 匹配必须放行,
     ///     否则更新链自我中断; 注释曾与实现相反已修复)。
     ///   - M13 落地时**同一版本原子切换**: 本函数末尾改为 `return sig == true` (签名缺失即拒绝),

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 #  assemble.sh — 从 plugins.json 列出的子项目仓库收集部署资源
-#  [2026-09-22] 迁移至 GitHub: Gitea API -> GitHub API (api.github.com/repos, 克隆走 github.com)
+#  [2026-09-22] 迁移至 GitHub: GitHub API -> GitHub API (api.github.com/repos, 克隆走 github.com)
 #  运行环境: mcr.microsoft.com/dotnet/sdk:9.0 容器 (git/curl/jq 可用)
 #  依赖环境变量: PAT (克隆私有子仓库用的 token)
 #  产物: 重建 DeployResources/application/ (扁平放置各插件的部署文件)
@@ -23,7 +23,7 @@ source "$SCRIPT_DIR/release-notes.sh"
 GIT_HOST="${GIT_HOST:-github.com}"
 API_BASE="${API_BASE:-https://api.github.com}"
 OWNER="${GIT_OWNER:-${GITHUB_REPOSITORY_OWNER:-zhaoshen}}"
-INSTALLER_REPO="${GITEA_REPO:-ikun_installer}"
+INSTALLER_REPO="${GIT_REPO:-ikun_installer}"
 RELEASE_TAG="${RELEASE_TAG:-latest}"
 APP_DIR="DeployResources/application"
 CHANGES_FILE="$SCRIPT_DIR/_plugin_changes.md"
@@ -54,7 +54,7 @@ printf '{"schema":1,"plugins":{}}\n' > "$PREVIOUS_REVISIONS"
 # WHY: 滚动 Release 的 tag 每次都会重建，仓库自身不能表示上次安装包包含了哪些子项目提交。
 # 因此发布脚本把提交清单作为不可见元数据写入 Release 正文；下一次打包先读取它再做增量比较。
 echo "== 读取上次 Release 的子项目版本基线 =="
-if release_json=$(curl --fail --silent --show-error --max-time 20 -H "Authorization: token ${PAT}" \
+if release_json=$(curl --fail --silent --show-error --max-time 20 -H "Authorization: Bearer ${PAT}" \
     "${API}/releases/tags/${RELEASE_TAG}" 2>/dev/null); then
   marker=$(printf '%s' "$release_json" | jq -r '.body // ""' |
     grep -oE '<!-- ikun-plugin-revisions:[A-Za-z0-9+/=]+ -->' | tail -1 || true)
@@ -205,9 +205,9 @@ while IFS='|' read -r repo ref; do
     echo "  - ⚠ **${repo}** 制品已更新但无 CHANGELOG 文字说明（违反规范 §6.2，gate G4 阶段一）" >> "$CHANGES_FILE"
     # 开 Issue 一律开在安装器仓 (规范 G4: 避免 CI token 需要各插件仓写权限, 与 M11 最小权限一致)
     issue_title="[G4] ${repo} 制品更新缺 CHANGELOG 条目"
-    if ! curl --fail --silent --show-error --max-time 20 -H "Authorization: token ${PAT}" \
+    if ! curl --fail --silent --show-error --max-time 20 -H "Authorization: Bearer ${PAT}" \
         "${API}/issues?state=open&per_page=100" 2>/dev/null | grep -qF "$issue_title"; then
-      curl --fail --silent --show-error --max-time 20 -X POST -H "Authorization: token ${PAT}" \
+      curl --fail --silent --show-error --max-time 20 -X POST -H "Authorization: Bearer ${PAT}" \
         -H "Content-Type: application/json" \
         -d "$(jq -n --arg t "$issue_title" --arg b "打包时发现 ${repo} 制品(dll/dlx/dat)已更新但 CHANGELOG.md 无新增条目（规范 §6.4 gate G4 阶段一）。请在变更提交中补充用户可感知的变更说明，否则阶段二将打包失败。" '{title:$t, body:$b}')" \
         "${API}/issues" >/dev/null 2>&1 && echo "  已开 Issue: $issue_title" || echo "  (开 Issue 失败, 不影响打包)"

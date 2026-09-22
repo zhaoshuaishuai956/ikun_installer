@@ -39,7 +39,7 @@
 ### P1-2 PostgreSQL 集成/权限负测试未完成
 
 - 影响：SQL 已参数化并使用幂等写入，但没有真实数据库证据。
-- 修复：使用迁移角色执行 SQL；使用 runtime 账号验证 CREATE/ALTER/DROP/DELETE/TRUNCATE 和 Gitea 访问均失败。
+- 修复：使用迁移角色执行 SQL；使用 runtime 账号验证 CREATE/ALTER/DROP/DELETE/TRUNCATE 和 GitHub 访问均失败。
 
 ### P1-3 全局并发/速率限制需要生产负载测试
 

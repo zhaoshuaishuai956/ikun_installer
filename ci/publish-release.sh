@@ -3,7 +3,7 @@
 #  publish-release.sh — 创建/更新 Release, 上传安装器和插件资源
 #  [2026-09-22] 迁移至 GitHub: Release/标签 API -> GitHub API; 附件上传 -> uploads.github.com(octet-stream)
 #  用法: publish-release.sh <exe路径> <资源清单> <资源目录>
-#  依赖环境变量: PAT; 可选: GITEA_HOST/OWNER/REPO, RELEASE_TAG, BUILD_TIME
+#  依赖环境变量: PAT; 可选: GIT_HOST/OWNER/REPO, RELEASE_TAG, BUILD_TIME
 #  策略: 滚动 tag(默认 latest), 每次删旧 release+标签后在【当前最新提交】重建,
 #        使标签始终指向最新提交(页面不再停在旧提交); 版本号随 run_number 递增。
 # ============================================================
@@ -27,7 +27,7 @@ UPDATE_KIND="${UPDATE_KIND:-installer}"
 PLUGIN_COUNT="${PLUGIN_COUNT:-?}"
 API="${API_BASE}/repos/${OWNER}/${REPO}"
 UPLOAD_API="${UPLOAD_BASE:-https://uploads.github.com}/repos/${OWNER}/${REPO}"
-AUTH="Authorization: token ${PAT}"
+AUTH="Authorization: Bearer ${PAT}"
 
 [ -f "$EXE" ] || { echo "错误: 找不到 $EXE"; exit 1; }
 [ -f "$MANIFEST" ] || { echo "错误: 找不到资源清单 $MANIFEST"; exit 1; }

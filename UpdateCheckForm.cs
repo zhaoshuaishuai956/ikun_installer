@@ -71,7 +71,7 @@ public sealed class UpdateCheckForm : Form
         if (remote == null)
         {
             TelemetryClient.QueueEvent("update_check", "first_plugin_use", "failed");
-            _lblStatus.Text = "检查失败: 无法连接 Gitea 或解析版本信息";
+            _lblStatus.Text = "检查失败: 无法连接 GitHub 或解析版本信息";
             _btnClose.Enabled = true;
             return;
         }

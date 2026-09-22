@@ -67,7 +67,7 @@
   CHANGELOG.md
   LICENSE
   .gitignore / .gitattributes
-  .gitea/workflows/notify-installer.yml   # in_ikun=true 时
+  .github/workflows/notify-installer.yml   # in_ikun=true 时
 ```
 
 `plugin.meta` 使用 UTF-8、无 BOM、`key=value`，只允许：
@@ -108,7 +108,7 @@ in_ikun=true|false
 
 ## 6. 首次点击强提醒更新（所有在册插件强制）
 
-更新判断集中在安装器；子插件只负责触发，不自行访问 Gitea、不解析版本、不下载文件。
+更新判断集中在安装器；子插件只负责触发，不自行访问 GitHub、不解析版本、不下载文件。
 
 - 每个在册插件必须包含统一的 `ikun_update_check.hpp`；权威模板位于
   `docs/nx-development/templates/ikun_update_check.hpp`。

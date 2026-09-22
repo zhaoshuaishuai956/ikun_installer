@@ -1,4 +1,4 @@
-# 权威模板 (GitHub Actions) — [2026-09-22] 由 Gitea Actions 迁移
+# 权威模板 (GitHub Actions) — [2026-09-22] 由 GitHub Actions 迁移
 # 用法: 复制到 <repo>/.github/workflows/ 下; 唯一定制项见文件内注释
 name: notify-installer
 # 本插件更新(制品 dll/dlx/dat 变更)后, 触发爱坤工具箱安装器(ikun_installer)在 rock5t 上重新打包

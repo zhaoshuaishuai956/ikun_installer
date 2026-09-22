@@ -38,7 +38,7 @@ NX 插件标准化发布安装器：打包、部署和安装 AiKun Toolbox 集�
 ```powershell
 # 本地调试编译 (WinForms 需 Windows):
 dotnet build ikun_installer.csproj -c Release
-# 真包由 CI 在 rock5t 交叉编译 (自包含单文件 win-x64), 见 .gitea/workflows/pack.yml
+# 真包由 CI 在 rock5t 交叉编译 (自包含单文件 win-x64), 见 .github/workflows/pack.yml
 ```
 
 ## Test — 测试
@@ -65,13 +65,13 @@ dotnet build ikun_installer.csproj -c Release
 | `ci/gates.sh` | CI：闸门 G2/G3/G6 |
 | `ci/check_consistency.py` | CI：闸门 G5/G7 一致性校验 |
 | `ci/release-notes.sh` | CI：按上次 Release 基线提取子插件增量更新 |
-| `ci/publish-release.sh` | CI：创建/更新 Gitea Release（含安装器更新段 + sha256） |
-| `.gitea/workflows/pack.yml` | CI：打包工作流（含全部闸门） |
+| `ci/publish-release.sh` | CI：创建/更新 GitHub Release（含安装器更新段 + sha256） |
+| `.github/workflows/pack.yml` | CI：打包工作流（含全部闸门） |
 | `DeployResources/startup/` | 部署资源（菜单/工具栏/图标，GBK 编码） |
 
 ## 自动打包（rock5t CI）
 
-子项目更新后**自动**在 Gitea 主机 rock5t 上打包并更新 Release，无需本机操作。
+子项目更新后**自动**在 GitHub 主机 rock5t 上打包并更新 Release，无需本机操作。
 
 **触发链**：改插件源码 → push 子项目（dll/dlx/dat 变更）→ 子项目 `notify-installer.yml`（权威模板见 `docs/templates/`）调 API 触发本仓库 `pack.yml` → rock5t 的 act_runner 在 `dotnet/sdk:9.0` 容器里：读 `plugins.json` → clone 各子项目收集资源 → 闸门 G1–G8（规范 §7.3）→ 交叉编译 win-x64 单文件 exe（`EnableWindowsTargeting=true`）→ 更新 Release `latest`（包含完整安装器 exe、资源清单和逐项插件资源）。
 
@@ -80,7 +80,7 @@ dotnet build ikun_installer.csproj -c Release
 **加新插件**（规范 §8.2 三步接入，同一提交完成）：
 1. `plugins.json` 登记（repo + ref）；
 2. `DeployResources/startup/` 追加菜单/图标（GBK 编码，LABEL=该仓 `plugin.meta` 的 `name_cn`，见 `custom.men`/`ikun.rtb`）；
-3. 新插件仓库放 `.gitea/workflows/notify-installer.yml`（从权威模板复制，仅允许定制 paths）。
+3. 新插件仓库放 `.github/workflows/notify-installer.yml`（从权威模板复制，仅允许定制 paths）。
 4. 中文 `name_cn` 必须正好四个汉字；复制 `docs/nx-development/templates/ikun_update_check.hpp`，
    在 `ufusr` 的 `UF_initialize()` 前调用 `CheckOnceOnFirstPluginUse()`，并保持 `UF_UNLOAD_IMMEDIATELY` 以支持热更新。
 
@@ -88,6 +88,6 @@ dotnet build ikun_installer.csproj -c Release
 
 **更新记录**：Release 正文内嵌上次实际打包的子项目提交清单；资源清单还会记录每个资源对应的插件中文名和功能说明。下次构建只展示清单之后新增的 `CHANGELOG.md` 条目（包括 `Unreleased`）；未维护 CHANGELOG 时回退到提交标题。每个插件最多展示 8 条，未变化的插件不重复列出。NX 原子更新完成后会按插件分组显示具体更新内容。
 
-**手动触发**：本仓库 Actions 页运行 `pack-installer`，或 `POST /api/v1/repos/zhaoshen/ikun_installer/actions/workflows/pack.yml/dispatches`。
+**手动触发**：本仓库 Actions 页运行 `pack-installer`，或 `POST /repos/zhaoshen/ikun_installer/actions/workflows/pack.yml/dispatches`。
 
-> 自动链路走 Gitea Release；`build.ps1` 刷公司共享盘（Y:/X:）的旧方式保留作可选（rock5t 够不到 NAS）。
+> 自动链路走 GitHub Release；`build.ps1` 刷公司共享盘（Y:/X:）的旧方式保留作可选（rock5t 够不到 NAS）。

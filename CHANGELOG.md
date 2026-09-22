@@ -1,5 +1,19 @@
 # 变更日志
 
+## 2026-09-22 — 仓库与发布链迁移至 GitHub
+
+- **变更**: 项目从自托管 Gitea 迁移到 GitHub (`zhaoshuaishuai956` 账号下的
+  `ikun_installer` 公开仓库)，CI 打包流水线由 Gitea Actions 迁移为 GitHub Actions。
+- **变更**: 安装器「检查更新」端点由已停用的 `gt.h.zss.fan:2233` 改为
+  `https://api.github.com/repos/zhaoshuaishuai956/ikun_installer/releases/tags/latest`。
+- **变更**: 配置项 `gitea_api` 更名 `release_api`（注册表 `HKCU\Software\ikun_tools`），
+  属性 `GiteaLatestApi` 更名 `LatestReleaseApi`。
+- **变更**: 打包流水线 runner 由自建 act_runner 标签 `dotnet` 改为 GitHub 托管
+  `ubuntu-latest` + `actions/setup-dotnet@9.0.x`；新增 `actions/checkout`。
+- **移除**: `.gitea/workflows/`（GitHub 不识别该目录）。
+- **注意**: GitHub 单文件硬上限 100 MB，历史中的 `publish/ikun_installer.exe`(100.9 MB)
+  已在迁移时从 git 历史移除。
+
 ## Unreleased
 
 - **优化**: 8 个在册业务插件正式换用紫色品牌功能图标，保持原菜单按钮与功能注册不变。
