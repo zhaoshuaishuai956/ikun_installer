@@ -38,7 +38,7 @@ NX 插件标准化发布安装器：打包、部署和安装 AiKun Toolbox 集�
 ```powershell
 # 本地调试编译 (WinForms 需 Windows):
 dotnet build ikun_installer.csproj -c Release
-# 真包由 CI 在 rock5t 交叉编译 (自包含单文件 win-x64), 见 .github/workflows/pack.yml
+# 真包由 CI 在 GitHub Actions (ubuntu-latest) 交叉编译 (自包含单文件 win-x64), 见 .github/workflows/pack.yml
 ```
 
 ## Test — 测试
@@ -69,11 +69,11 @@ dotnet build ikun_installer.csproj -c Release
 | `.github/workflows/pack.yml` | CI：打包工作流（含全部闸门） |
 | `DeployResources/startup/` | 部署资源（菜单/工具栏/图标，GBK 编码） |
 
-## 自动打包（rock5t CI）
+## 自动打包（GitHub Actions CI）
 
-子项目更新后**自动**在 GitHub 主机 rock5t 上打包并更新 Release，无需本机操作。
+子项目更新后**自动**在 GitHub Actions 上打包并更新 Release，无需本机操作。
 
-**触发链**：改插件源码 → push 子项目（dll/dlx/dat 变更）→ 子项目 `notify-installer.yml`（权威模板见 `docs/templates/`）调 API 触发本仓库 `pack.yml` → rock5t 的 act_runner 在 `dotnet/sdk:9.0` 容器里：读 `plugins.json` → clone 各子项目收集资源 → 闸门 G1–G8（规范 §7.3）→ 交叉编译 win-x64 单文件 exe（`EnableWindowsTargeting=true`）→ 更新 Release `latest`（包含完整安装器 exe、资源清单和逐项插件资源）。
+**触发链**：改插件源码 → push 子项目（dll/dlx/dat 变更）→ 子项目 `notify-installer.yml`（权威模板见 `docs/templates/`）调 API 触发本仓库 `pack.yml` → GitHub Actions 在 `ubuntu-latest` 上用 `actions/setup-dotnet` 装 9.0 SDK：读 `plugins.json` → clone 各子项目收集资源 → 闸门 G1–G8（规范 §7.3）→ 交叉编译 win-x64 单文件 exe（`EnableWindowsTargeting=true`）→ 更新 Release `latest`（包含完整安装器 exe、资源清单和逐项插件资源）。
 
 **取用**：从本仓库 **Releases → latest** 下载 `ikun_installer.exe` 运行安装。
 
@@ -88,6 +88,6 @@ dotnet build ikun_installer.csproj -c Release
 
 **更新记录**：Release 正文内嵌上次实际打包的子项目提交清单；资源清单还会记录每个资源对应的插件中文名和功能说明。下次构建只展示清单之后新增的 `CHANGELOG.md` 条目（包括 `Unreleased`）；未维护 CHANGELOG 时回退到提交标题。每个插件最多展示 8 条，未变化的插件不重复列出。NX 原子更新完成后会按插件分组显示具体更新内容。
 
-**手动触发**：本仓库 Actions 页运行 `pack-installer`，或 `POST /repos/zhaoshen/ikun_installer/actions/workflows/pack.yml/dispatches`。
+**手动触发**：本仓库 Actions 页运行 `pack-installer`，或 `POST /repos/zhaoshuaishuai956/ikun_installer/actions/workflows/pack.yml/dispatches`。
 
-> 自动链路走 GitHub Release；`build.ps1` 刷公司共享盘（Y:/X:）的旧方式保留作可选（rock5t 够不到 NAS）。
+> 自动链路走 GitHub Release；`build.ps1` 刷公司共享盘（Y:/X:）的旧方式保留作可选（CI 环境够不到公司 NAS）。

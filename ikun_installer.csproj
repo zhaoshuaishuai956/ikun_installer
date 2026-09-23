@@ -18,7 +18,7 @@
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SatelliteResourceLanguages>zh-Hans</SatelliteResourceLanguages>
-    <!-- 允许在非 Windows 主机(rock5t/Linux arm64 CI)上交叉发布 win-x64 -->
+    <!-- 允许在非 Windows 主机(GitHub Actions 的 Linux runner)上交叉发布 win-x64 -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>

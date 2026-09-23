@@ -30,12 +30,12 @@ function Invoke-RemoteClone {
     [Parameter(Mandatory = $true)][string]$Destination
   )
 
-  # [2026-09-22] 迁移至 GitHub: 优先 GIT_HOST/GIT_USER/GIT_TOKEN, 回退旧 GITEA_* 变量
-  $gitHost  = if ($env:GIT_HOST)  { $env:GIT_HOST }  else { $env:GIT_HOST }
-  $gitUser  = if ($env:GIT_USER)  { $env:GIT_USER }  else { $env:GIT_USER }
-  $gitToken = if ($env:GIT_TOKEN) { $env:GIT_TOKEN } else { $env:GIT_TOKEN }
-  if (-not $gitHost -or -not $gitUser -or -not $gitToken) {
-    throw "远程克隆需要 GIT_HOST、GIT_USER、GIT_TOKEN 环境变量 (旧名 GIT_HOST/GIT_USER/GIT_TOKEN 亦可)"
+  # GIT_HOST 可选, 默认 github.com; GIT_USER / GIT_TOKEN 必须提供
+  $gitHost  = if ($env:GIT_HOST) { $env:GIT_HOST } else { 'github.com' }
+  $gitUser  = $env:GIT_USER
+  $gitToken = $env:GIT_TOKEN
+  if (-not $gitUser -or -not $gitToken) {
+    throw "远程克隆需要 GIT_USER、GIT_TOKEN 环境变量 (GIT_HOST 可选, 默认 github.com)"
   }
 
   $hostNoProto = $gitHost -replace '^https?://', ''

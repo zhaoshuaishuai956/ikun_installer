@@ -2,7 +2,7 @@
 # ============================================================
 #  gen-icons.sh — 为缺失工具栏图标的插件自动生成 24x24 BMP
 #  (对齐旧 build.ps1 的 PIL 生成逻辑, 橙色文字+灰边框)
-#  运行环境: dotnet/sdk:9.0 容器; 需要时才 apt 装 imagemagick + 中文字体
+#  运行环境: GitHub Actions ubuntu-latest; 需要时才 apt 装 imagemagick + 中文字体
 #
 #  说明: 只生成 startup/ikun_<dll基名>.bmp 位图文件本身。
 #        插件要在 NX 里显示, 仍需在 custom.men / custom.tbr / ikun.rtb

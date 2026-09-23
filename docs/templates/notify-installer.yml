@@ -1,11 +1,12 @@
-# 权威模板 (GitHub Actions) — [2026-09-22] 由 GitHub Actions 迁移
+# 权威模板 (GitHub Actions)
 # 用法: 复制到 <repo>/.github/workflows/ 下; 唯一定制项见文件内注释
 name: notify-installer
-# 本插件更新(制品 dll/dlx/dat 变更)后, 触发爱坤工具箱安装器(ikun_installer)在 rock5t 上重新打包
+# 本插件更新(制品 dll/dlx/dat 变更)后, 触发爱坤工具箱安装器(ikun_installer)在 GitHub Actions 上重新打包
 # 权威模板: ikun_installer/docs/templates/notify-installer.yml (规范 §8.2)
 # 允许的唯一定制: on.push.paths 列表 (按本仓制品扩展名调整, 如含 .def 的插件把 **.dat 换 **.def)
 # 定制时必须在本注释注明: 模板: <路径>, 定制: paths=<扩展名>
 # 禁止改动: dispatch 端点 / secret 名 / 分支名 / curl 参数(-k 禁止, 规范 §11.6)
+permissions: {}
 on:
   push:
     branches: [master]

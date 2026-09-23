@@ -2,7 +2,7 @@
 # ============================================================
 #  assemble.sh — 从 plugins.json 列出的子项目仓库收集部署资源
 #  [2026-09-22] 迁移至 GitHub: GitHub API -> GitHub API (api.github.com/repos, 克隆走 github.com)
-#  运行环境: mcr.microsoft.com/dotnet/sdk:9.0 容器 (git/curl/jq 可用)
+#  运行环境: GitHub Actions ubuntu-latest + actions/setup-dotnet (git/curl/jq 可用)
 #  依赖环境变量: PAT (克隆私有子仓库用的 token)
 #  产物: 重建 DeployResources/application/ (扁平放置各插件的部署文件)
 #        + 生成 ci/_plugin_changes.md (相对上次 Release 的子项目增量摘要)
@@ -22,7 +22,7 @@ source "$SCRIPT_DIR/release-notes.sh"
 # ---- 迁移后 (GitHub): 主机/API 基址可覆盖, 默认 GitHub ----
 GIT_HOST="${GIT_HOST:-github.com}"
 API_BASE="${API_BASE:-https://api.github.com}"
-OWNER="${GIT_OWNER:-${GITHUB_REPOSITORY_OWNER:-zhaoshen}}"
+OWNER="${GIT_OWNER:-${GITHUB_REPOSITORY_OWNER:-zhaoshuaishuai956}}"
 INSTALLER_REPO="${GIT_REPO:-ikun_installer}"
 RELEASE_TAG="${RELEASE_TAG:-latest}"
 APP_DIR="DeployResources/application"

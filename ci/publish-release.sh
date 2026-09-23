@@ -15,7 +15,7 @@ RESOURCE_DIR="${3:?用法: publish-release.sh <exe路径> <资源清单> <资源
 # ---- 迁移后 (GitHub): 主机/API 基址可覆盖, 默认 GitHub ----
 GIT_HOST="${GIT_HOST:-github.com}"
 API_BASE="${API_BASE:-https://api.github.com}"
-OWNER="${GIT_OWNER:-${GITHUB_REPOSITORY_OWNER:-zhaoshen}}"
+OWNER="${GIT_OWNER:-${GITHUB_REPOSITORY_OWNER:-zhaoshuaishuai956}}"
 REPO="${GIT_REPO:-ikun_installer}"
 TAG="${RELEASE_TAG:-latest}"
 NAME="ikun_installer.exe"

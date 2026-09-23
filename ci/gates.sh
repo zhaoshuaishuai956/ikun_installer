@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 #  gates.sh — CI 制品/结构闸门 G2/G3/G6/G8 (规范 §7.3)
-#  运行环境: pack.yml (dotnet/sdk:9.0 容器, 已安装 binutils/libxml2-utils/python3)
+#  运行环境: pack.yml (ubuntu-latest, 已安装 binutils/libxml2-utils/python3)
 #  失败退出非 0 → pack 失败。G4 在 assemble.sh 内, G1 在 assemble.sh 内,
 #  G5/G7 由 check_consistency.py 承担。
 # ============================================================
