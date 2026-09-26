@@ -10,16 +10,16 @@
 
 ## 插件总览
 
-| 菜单项 | 插件 | 功能 | 操作视频 |
+| 菜单项 | 插件 | 功能 | 演示 |
 |--------|------|------|----------|
-| 实体排样 | MultiEntityNester | 多实体投影 2D，板材范围自动排样，最小化材料浪费 | [▶ 观看](docs/videos/MultiEntityNester.mp4) |
+| 实体排样 | MultiEntityNester | 多实体投影 2D，板材范围自动排样，最小化材料浪费 | [▶ 动图](docs/videos/MultiEntityNester.gif) |
 | 定位凸台 | block_boss_layout | 活动块上自动创建安装定位凸台（参数化、批量） | — |
 | 顶针布局 | ejector_layout | 快速布置顶针，自动干涉 / 超界检查 | — |
 | 孔位标注 | pmi_hole_dim | 规则矩形平面自动识别圆孔，生成 PMI 尺寸与孔表 | — |
 | 单线刻字 | single_line_text | 中文/英文/数字 → CAM 可用的单线字体曲线 | — |
-| 文字排版 | text_auto_layout | 文字 → 曲线 → 拉伸（可拔模）实体，居中排版 | [▶ 观看](docs/videos/text_auto_layout.mp4) |
-| 活字排版 | type_layout | 按批次号规则生成活字底板与立体文字（日期章/批号章） | [▶ 观看](docs/videos/type_layout.mp4) |
-| 板面导出 | plate_dwg_export | 平面轮廓按排样布局导出 DWG（线切割/激光切割） | [▶ 观看](docs/videos/plate_dwg_export.mp4) |
+| 文字排版 | text_auto_layout | 文字 → 曲线 → 拉伸（可拔模）实体，居中排版 | [▶ 动图](docs/videos/text_auto_layout.gif) |
+| 活字排版 | type_layout | 按批次号规则生成活字底板与立体文字（日期章/批号章） | [▶ 动图](docs/videos/type_layout.gif) |
+| 板面导出 | plate_dwg_export | 平面轮廓按排样布局导出 DWG（线切割/激光切割） | [▶ 动图](docs/videos/plate_dwg_export.gif) |
 
 ## 使用方法
 
@@ -35,7 +35,9 @@
 4. 设置板材尺寸、间距、旋转角度；「高级」分组可选四档算法（BL 基线 / Compact-BLF / Adaptive Best-Fit / Beam-LNS）与可复现随机种子。
 5. 开始排样 → 可开启四算法 SVG 预览对比布局与利用率，点击卡片后由 NX 实际落位。
 
-▶ [操作演示视频](docs/videos/MultiEntityNester.mp4)
+![实体排样操作演示](docs/videos/MultiEntityNester.gif)
+
+▶ [完整视频](docs/videos/MultiEntityNester.mp4)
 
 ### 定位凸台（block_boss_layout）
 
@@ -84,7 +86,9 @@
 3. 设字高 / 拉伸厚度 / 拔模角 / 字符间距 / 行距 → 应用。
 4. 每个字符逐个生成并关联，分字 100% 准确；对话框打开时以青色临时线实时预览轮廓（不创建特征）。
 
-▶ [操作演示视频](docs/videos/text_auto_layout.mp4)
+![文字排版操作演示](docs/videos/text_auto_layout.gif)
+
+▶ [完整视频](docs/videos/text_auto_layout.mp4)
 
 ### 活字排版（type_layout）
 
@@ -96,7 +100,9 @@
 4. 附加材料可选「整体包容」或「线切割」（自动创建边框实体）；可启用缺口补位填满网格。
 5. 确定生成 → 对话框实时显示每种活字数量、总数与预计网格；勾选「生成线切割 CAD」可在创建前调出保存对话框导出 DWG（未检测到 AutoCAD 时交付俯视 DXF）。
 
-▶ [操作演示视频](docs/videos/type_layout.mp4)
+![活字排版操作演示](docs/videos/type_layout.gif)
+
+▶ [完整视频](docs/videos/type_layout.mp4)
 
 ### 板面导出（plate_dwg_export）
 
@@ -107,7 +113,9 @@
 3. 可勾选：内外环分图层、导出后打开文件夹、导出后用默认软件打开。
 4. 确定（导出并关闭）或 应用（导出并保留对话框）。
 
-▶ [操作演示视频](docs/videos/plate_dwg_export.mp4)
+![板面导出操作演示](docs/videos/plate_dwg_export.gif)
+
+▶ [完整视频](docs/videos/plate_dwg_export.mp4)
 
 ## 开发
 
